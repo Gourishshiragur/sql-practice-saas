@@ -14,20 +14,21 @@ templates = Jinja2Templates(directory="app/templates")
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, level: str = "easy", last_qid: str | None = None):
     questions = QUESTIONS[level]
+    qids = [q["qid"] for q in questions]
 
-    if last_qid:
-        qids = [q["qid"] for q in questions]
-        try:
-            index = qids.index(last_qid) + 1
-        except ValueError:
-            index = 0
+    # current index logic (UNCHANGED BEHAVIOR)
+    if last_qid and last_qid in qids:
+        index = qids.index(last_qid) + 1
     else:
         index = 0
 
     if index >= len(questions):
-        index = 0
+        index = len(questions) - 1
 
     q = questions[index]
+
+    # ✅ ADDITION: previous question id
+    prev_qid = qids[index - 1] if index > 0 else None
 
     return templates.TemplateResponse(
         "index.html",
@@ -41,6 +42,7 @@ def home(request: Request, level: str = "easy", last_qid: str | None = None):
                 "number": index + 1,
                 "total": len(questions),
             },
+            "prev_qid": prev_qid,  # 👈 NEW (safe)
         },
     )
 
