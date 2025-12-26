@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -7,21 +7,12 @@ from app.questions import QUESTIONS
 
 app = FastAPI()
 
-# -----------------------------
-# STATIC & TEMPLATES
-# -----------------------------
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
-# -----------------------------
-# HOME PAGE
-# -----------------------------
+
 @app.get("/", response_class=HTMLResponse)
-def home(
-    request: Request,
-    level: str = "easy",
-    last_qid: str | None = None
-):
+def home(request: Request, level: str = "easy", last_qid: str | None = None):
     questions = QUESTIONS[level]
 
     if last_qid:
@@ -53,35 +44,22 @@ def home(
         },
     )
 
-# -----------------------------
-# RUN QUERY (DEMO LOGIC)
-# -----------------------------
+
 @app.post("/run")
-def run_query(
-    user_sql: str = Form(...),
-    qid: str = Form(...)
-):
+def run_query(user_sql: str = Form(...), qid: str = Form(...)):
     for level in QUESTIONS:
         for q in QUESTIONS[level]:
             if q["qid"] == qid:
-                expected = q["expected_sql"]
-                is_correct = expected.lower() in user_sql.lower()
-
+                correct = q["expected_sql"].lower() == user_sql.strip().lower()
                 return {
-                    "status": "correct" if is_correct else "wrong",
-                    "expected_sql": expected,
-                    "cols": ["Result"],
-                    "rows": [["Query executed successfully (demo)"]],
+                    "status": "correct" if correct else "wrong",
+                    "expected_sql": q["expected_sql"],
+                    "cols": q["result"]["cols"],
+                    "rows": q["result"]["rows"],
                 }
+    return {"status": "error"}
 
-    return JSONResponse(
-        status_code=400,
-        content={"status": "error", "message": "Invalid question id"},
-    )
 
-# -----------------------------
-# SHOW ANSWER
-# -----------------------------
 @app.post("/show-answer")
 def show_answer(qid: str = Form(...)):
     for level in QUESTIONS:
@@ -89,18 +67,12 @@ def show_answer(qid: str = Form(...)):
             if q["qid"] == qid:
                 return {
                     "expected_sql": q["expected_sql"],
-                    "cols": ["Result"],
-                    "rows": [["Correct query output (demo)"]],
+                    "cols": q["result"]["cols"],
+                    "rows": q["result"]["rows"],
                 }
+    return {"status": "error"}
 
-    return JSONResponse(
-        status_code=400,
-        content={"message": "Invalid question id"},
-    )
 
-# -----------------------------
-# AVAILABLE TABLES (SQL-EDITOR STYLE)
-# -----------------------------
 @app.get("/tables")
 def tables():
     return {
@@ -122,9 +94,7 @@ def tables():
         },
     }
 
-# -----------------------------
-# HEALTH CHECK
-# -----------------------------
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
