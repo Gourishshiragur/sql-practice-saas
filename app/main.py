@@ -8,7 +8,7 @@ from app.questions import QUESTIONS
 app = FastAPI()
 
 # -----------------------------
-# STATIC & TEMPLATES (FIXED PATHS)
+# STATIC & TEMPLATES
 # -----------------------------
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
@@ -24,7 +24,6 @@ def home(
 ):
     questions = QUESTIONS[level]
 
-    # find next question index (no repeat)
     if last_qid:
         qids = [q["qid"] for q in questions]
         try:
@@ -55,21 +54,13 @@ def home(
     )
 
 # -----------------------------
-# META (TOTAL QUESTIONS PER LEVEL)
-# -----------------------------
-@app.get("/meta")
-def meta():
-    return {k: len(v) for k, v in QUESTIONS.items()}
-
-# -----------------------------
-# RUN QUERY
+# RUN QUERY (DEMO LOGIC)
 # -----------------------------
 @app.post("/run")
 def run_query(
     user_sql: str = Form(...),
     qid: str = Form(...)
 ):
-    # Demo validation logic
     for level in QUESTIONS:
         for q in QUESTIONS[level]:
             if q["qid"] == qid:
@@ -80,7 +71,7 @@ def run_query(
                     "status": "correct" if is_correct else "wrong",
                     "expected_sql": expected,
                     "cols": ["Result"],
-                    "rows": [["Query executed (demo result)"]],
+                    "rows": [["Query executed successfully (demo)"]],
                 }
 
     return JSONResponse(
@@ -99,7 +90,7 @@ def show_answer(qid: str = Form(...)):
                 return {
                     "expected_sql": q["expected_sql"],
                     "cols": ["Result"],
-                    "rows": [["Correct query result (demo)"]],
+                    "rows": [["Correct query output (demo)"]],
                 }
 
     return JSONResponse(
@@ -108,13 +99,27 @@ def show_answer(qid: str = Form(...)):
     )
 
 # -----------------------------
-# AVAILABLE TABLES (RIGHT PANEL)
+# AVAILABLE TABLES (SQL-EDITOR STYLE)
 # -----------------------------
 @app.get("/tables")
 def tables():
     return {
-        "employees": ["id", "name", "department", "salary", "hire_date"],
-        "departments": ["dept_id", "dept_name"],
+        "employees": {
+            "columns": ["id", "name", "department", "salary", "hire_date"],
+            "rows": [
+                [1, "Alice", "IT", 60000, "2021-03-01"],
+                [2, "Bob", "HR", 45000, "2020-07-15"],
+                [3, "Charlie", "IT", 70000, "2019-11-20"],
+            ],
+        },
+        "departments": {
+            "columns": ["dept_id", "dept_name"],
+            "rows": [
+                [10, "IT"],
+                [20, "HR"],
+                [30, "Finance"],
+            ],
+        },
     }
 
 # -----------------------------
