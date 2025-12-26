@@ -17,6 +17,10 @@ function correctKey() {
   return "correct_" + getLevel();
 }
 
+function completedKey() {
+  return "completed_" + getLevel();
+}
+
 function getSet(key) {
   try {
     return new Set(JSON.parse(sessionStorage.getItem(key) || "[]"));
@@ -27,6 +31,39 @@ function getSet(key) {
 
 function saveSet(key, set) {
   sessionStorage.setItem(key, JSON.stringify([...set]));
+}
+
+/* -----------------------------
+   LEVEL COMPLETION MESSAGE
+----------------------------- */
+function showCompletionMessage() {
+  const level = getLevel();
+  const out = document.getElementById("output");
+
+  const nextLevel =
+    level === "easy" ? "medium" :
+    level === "medium" ? "hard" :
+    null;
+
+  let msg = `🎉 You completed ${level.toUpperCase()} level!`;
+
+  if (nextLevel) {
+    msg += `<br>👉 Try <b>${nextLevel.toUpperCase()}</b> level next.`;
+  } else {
+    msg += `<br>🏆 You completed ALL levels!`;
+  }
+
+  out.innerHTML = `
+    <div style="
+      background:#ecfeff;
+      border-left:6px solid #06b6d4;
+      padding:16px;
+      border-radius:8px;
+      font-weight:600;
+    ">
+      ${msg}
+    </div>
+  `;
 }
 
 /* -----------------------------
@@ -41,40 +78,47 @@ function updateProgress() {
   const accuracyText = document.getElementById("accuracyText");
 
   const percent = Math.min((answered.size / TOTAL_QUESTIONS) * 100, 100);
+  progressBar.style.width = percent + "%";
 
-  if (progressBar) progressBar.style.width = percent + "%";
+  progressText.innerText =
+    `Progress: ${answered.size} / ${TOTAL_QUESTIONS}`;
 
-  if (progressText) {
-    progressText.innerText = `Progress: ${answered.size} / ${TOTAL_QUESTIONS}`;
+  const accuracy =
+    answered.size === 0
+      ? 0
+      : Math.round((correct.size / answered.size) * 100);
+
+  accuracyText.innerText =
+    `Accuracy: ${accuracy}% (${correct.size} correct out of ${answered.size})`;
+      // ✅ COMPLETION CHECK (THIS IS THE DECIDING POINT)
+  const completed = sessionStorage.getItem(completedKey());
+
+  if (answered.size === TOTAL_QUESTIONS && !completed) {
+    sessionStorage.setItem(completedKey(), "true");
+    showCompletionMessage();   // 🔥 YOUR FUNCTION CALLED HERE
   }
+}
 
-  if (accuracyText) {
-    const accuracy =
-      answered.size === 0
-        ? 0
-        : Math.round((correct.size / answered.size) * 100);
-
-    accuracyText.innerText =
-      `Accuracy: ${accuracy}% (${correct.size} correct out of ${answered.size})`;
+  /* ✅ LEVEL COMPLETION CHECK */
+  const completed = sessionStorage.getItem(completedKey());
+  if (answered.size === TOTAL_QUESTIONS && !completed) {
+    sessionStorage.setItem(completedKey(), "true");
+    showCompletionMessage();
   }
 }
 
 /*
-  ✅ IMPORTANT FIX:
-  - Count each question ONLY ONCE
-  - Re-running same question does NOT change progress
+  ✅ Count each question ONLY ONCE
 */
 function markAnswered(qid, isCorrect) {
   const answered = getSet(answeredKey());
   const correct = getSet(correctKey());
 
-  // ❌ Already answered → do nothing
   if (answered.has(qid)) {
     updateProgress();
     return;
   }
 
-  // First-time answer
   answered.add(qid);
   saveSet(answeredKey(), answered);
 
@@ -97,17 +141,16 @@ document.addEventListener("DOMContentLoaded", () => {
 ----------------------------- */
 function renderTable(cols, rows) {
   let html = "<table><tr>";
-  cols.forEach(c => (html += `<th>${c}</th>`));
+  cols.forEach(c => html += `<th>${c}</th>`);
   html += "</tr>";
 
   rows.forEach(r => {
     html += "<tr>";
-    r.forEach(v => (html += `<td>${v}</td>`));
+    r.forEach(v => html += `<td>${v}</td>`);
     html += "</tr>";
   });
 
-  html += "</table>";
-  return html;
+  return html + "</table>";
 }
 
 /* -----------------------------
@@ -118,7 +161,6 @@ async function runQuery() {
   const sql = document.getElementById("sql").value.trim();
   const out = document.getElementById("output");
 
-  // ✅ FIX #1: Empty query validation
   if (!sql) {
     out.innerHTML =
       `<p style="color:red">⚠️ Please enter a SQL query before clicking Run.</p>`;
@@ -160,7 +202,6 @@ async function showAnswer() {
 
   const data = await res.json();
 
-  // ❌ "I don’t know" counts as answered but NOT correct
   markAnswered(qid, false);
 
   out.innerHTML = `
