@@ -1,24 +1,45 @@
 const TOTAL_QUESTIONS = 10;
 
 /* -----------------------------
-   PROGRESS BAR
+   PROGRESS BAR (FIXED)
 ----------------------------- */
-function updateProgress() {
-  let count = sessionStorage.getItem("progressCount");
-  count = count ? parseInt(count) : 0;
-
-  const percent = Math.min((count / TOTAL_QUESTIONS) * 100, 100);
-
-  document.getElementById("progressBar").style.width = percent + "%";
-  document.getElementById("progressText").innerText =
-    `Progress: ${count} / ${TOTAL_QUESTIONS}`;
+function getAnsweredSet() {
+  const stored = sessionStorage.getItem("answeredQids");
+  return stored ? new Set(JSON.parse(stored)) : new Set();
 }
 
-function incrementProgress() {
-  let count = sessionStorage.getItem("progressCount");
-  count = count ? parseInt(count) : 0;
-  sessionStorage.setItem("progressCount", count + 1);
+function saveAnsweredSet(set) {
+  sessionStorage.setItem("answeredQids", JSON.stringify([...set]));
+}
+
+function updateProgress() {
+  const answered = getAnsweredSet();
+  const count = Math.min(answered.size, TOTAL_QUESTIONS);
+
+  const percent = (count / TOTAL_QUESTIONS) * 100;
+
+  const bar = document.getElementById("progressBar");
+  const text = document.getElementById("progressText");
+
+  if (bar) bar.style.width = percent + "%";
+  if (text) text.innerText = `Progress: ${count} / ${TOTAL_QUESTIONS}`;
+}
+
+function markAnswered(qid) {
+  const answered = getAnsweredSet();
+
+  if (answered.has(qid)) {
+    return false; // already counted
+  }
+
+  if (answered.size >= TOTAL_QUESTIONS) {
+    return false; // progress full
+  }
+
+  answered.add(qid);
+  saveAnsweredSet(answered);
   updateProgress();
+  return true;
 }
 
 document.addEventListener("DOMContentLoaded", updateProgress);
@@ -27,14 +48,12 @@ document.addEventListener("DOMContentLoaded", updateProgress);
    TABLE RENDERER
 ----------------------------- */
 function renderResultTable(cols, rows) {
-  if (!cols || !rows) return "";
-
   let html = "<table><tr>";
   cols.forEach(c => html += `<th>${c}</th>`);
   html += "</tr>";
 
-  if (rows.length === 0) {
-    html += `<tr><td colspan="${cols.length}">No rows</td></tr>`;
+  if (!rows || rows.length === 0) {
+    html += `<tr><td colspan="${cols.length}">No data</td></tr>`;
   } else {
     rows.forEach(r => {
       html += "<tr>";
@@ -56,7 +75,7 @@ async function runQuery() {
   const out = document.getElementById("output");
 
   if (!sql) {
-    out.innerHTML = "<p class='bad'>Please write a query</p>";
+    out.innerHTML = "<p class='bad'>Please write a SQL query</p>";
     return;
   }
 
@@ -70,22 +89,14 @@ async function runQuery() {
 
   const data = await res.json();
 
-  incrementProgress();
+  // ✅ progress counted ONLY ONCE per question
+  markAnswered(qid);
 
-  if (data.status === "correct") {
-    out.innerHTML = `
-      <p class="ok">✅ Correct</p>
-      <pre>${data.expected_sql}</pre>
-      ${renderResultTable(data.cols, data.rows)}
-    `;
-  } else {
-    out.innerHTML = `
-      <p class="bad">❌ Wrong</p>
-      <h4>Correct Query</h4>
-      <pre>${data.expected_sql}</pre>
-      ${renderResultTable(data.cols, data.rows)}
-    `;
-  }
+  out.innerHTML = `
+    <p>${data.status === "correct" ? "✅ Correct" : "❌ Wrong"}</p>
+    <pre>${data.expected_sql}</pre>
+    ${renderResultTable(data.cols, data.rows)}
+  `;
 }
 
 /* -----------------------------
@@ -103,7 +114,8 @@ async function showAnswer() {
 
   const data = await res.json();
 
-  incrementProgress();
+  // ✅ progress counted ONLY ONCE per question
+  markAnswered(qid);
 
   out.innerHTML = `
     <h4>Correct Query</h4>
