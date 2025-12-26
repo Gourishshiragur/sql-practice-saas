@@ -1,26 +1,34 @@
 const TOTAL_QUESTIONS = 10;
 
 /* -----------------------------
-   GET CURRENT LEVEL
+   SAFE LEVEL DETECTION
 ----------------------------- */
 function getCurrentLevel() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("level") || "easy";
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("level") || "easy";
+  } catch (e) {
+    return "easy";
+  }
 }
 
 /* -----------------------------
-   STORAGE KEYS (PER LEVEL)
+   STORAGE KEY (PER LEVEL)
 ----------------------------- */
 function getAnsweredKey() {
-  return `answeredQids_${getCurrentLevel()}`;
+  return "answeredQids_" + getCurrentLevel();
 }
 
 /* -----------------------------
    PROGRESS BAR (LEVEL AWARE)
 ----------------------------- */
 function getAnsweredSet() {
-  const stored = sessionStorage.getItem(getAnsweredKey());
-  return stored ? new Set(JSON.parse(stored)) : new Set();
+  try {
+    const stored = sessionStorage.getItem(getAnsweredKey());
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch (e) {
+    return new Set();
+  }
 }
 
 function saveAnsweredSet(set) {
@@ -30,7 +38,6 @@ function saveAnsweredSet(set) {
 function updateProgress() {
   const answered = getAnsweredSet();
   const count = Math.min(answered.size, TOTAL_QUESTIONS);
-
   const percent = (count / TOTAL_QUESTIONS) * 100;
 
   const bar = document.getElementById("progressBar");
@@ -52,3 +59,114 @@ function markAnswered(qid) {
 }
 
 document.addEventListener("DOMContentLoaded", updateProgress);
+
+/* -----------------------------
+   TABLE RENDERER
+----------------------------- */
+function renderResultTable(cols, rows) {
+  let html = "<table><tr>";
+  cols.forEach(c => html += `<th>${c}</th>`);
+  html += "</tr>";
+
+  if (!rows || rows.length === 0) {
+    html += `<tr><td colspan="${cols.length}">No data</td></tr>`;
+  } else {
+    rows.forEach(r => {
+      html += "<tr>";
+      r.forEach(v => html += `<td>${v}</td>`);
+      html += "</tr>";
+    });
+  }
+
+  html += "</table>";
+  return html;
+}
+
+/* -----------------------------
+   RUN QUERY
+----------------------------- */
+async function runQuery() {
+  const sql = document.getElementById("sql").value.trim();
+  const qid = document.getElementById("qid").value;
+  const out = document.getElementById("output");
+
+  if (!sql) {
+    out.innerHTML = "<p class='bad'>Please write a SQL query</p>";
+    return;
+  }
+
+  out.innerHTML = "⏳ Running...";
+
+  const res = await fetch("/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ user_sql: sql, qid })
+  });
+
+  const data = await res.json();
+  markAnswered(qid);
+
+  out.innerHTML = `
+    <p>${data.status === "correct" ? "✅ Correct" : "❌ Wrong"}</p>
+    <pre>${data.expected_sql}</pre>
+    ${renderResultTable(data.cols, data.rows)}
+  `;
+}
+
+/* -----------------------------
+   SHOW ANSWER
+----------------------------- */
+async function showAnswer() {
+  const qid = document.getElementById("qid").value;
+  const out = document.getElementById("output");
+
+  const res = await fetch("/show-answer", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ qid })
+  });
+
+  const data = await res.json();
+  markAnswered(qid);
+
+  out.innerHTML = `
+    <h4>Correct Query</h4>
+    <pre>${data.expected_sql}</pre>
+    ${renderResultTable(data.cols, data.rows)}
+  `;
+}
+
+/* -----------------------------
+   TABLE TOGGLE
+----------------------------- */
+let tablesVisible = false;
+
+async function toggleTables() {
+  const panel = document.getElementById("tablePanel");
+  const left = document.getElementById("leftPanel");
+
+  if (!tablesVisible) {
+    panel.style.display = "block";
+    left.style.width = "65%";
+    panel.style.width = "35%";
+    await loadTableInfo();
+  } else {
+    panel.style.display = "none";
+    left.style.width = "100%";
+  }
+  tablesVisible = !tablesVisible;
+}
+
+async function loadTableInfo() {
+  const res = await fetch("/tables");
+  const data = await res.json();
+
+  let html = "";
+  for (const name in data) {
+    html += `<h4>${name}</h4>`;
+    html += renderResultTable(data[name].columns, data[name].rows);
+    html += "<br>";
+  }
+
+  document.getElementById("tableInfo").innerHTML = html;
+}
