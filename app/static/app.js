@@ -1,82 +1,97 @@
+console.log("✅ app.js loaded");
+
 const TOTAL_QUESTIONS = 10;
 
 /* -----------------------------
-   SAFE LEVEL DETECTION
+   LEVEL HELPERS
 ----------------------------- */
-function getCurrentLevel() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("level") || "easy";
-  } catch (e) {
-    return "easy";
-  }
+function getLevel() {
+  return new URLSearchParams(window.location.search).get("level") || "easy";
 }
 
-/* -----------------------------
-   STORAGE KEY (PER LEVEL)
------------------------------ */
-function getAnsweredKey() {
-  return "answeredQids_" + getCurrentLevel();
+function answeredKey() {
+  return "answered_" + getLevel();
 }
 
-/* -----------------------------
-   PROGRESS BAR (LEVEL AWARE)
------------------------------ */
-function getAnsweredSet() {
+function correctKey() {
+  return "correct_" + getLevel();
+}
+
+function getSet(key) {
   try {
-    const stored = sessionStorage.getItem(getAnsweredKey());
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  } catch (e) {
+    return new Set(JSON.parse(sessionStorage.getItem(key) || "[]"));
+  } catch {
     return new Set();
   }
 }
 
-function saveAnsweredSet(set) {
-  sessionStorage.setItem(getAnsweredKey(), JSON.stringify([...set]));
+function saveSet(key, set) {
+  sessionStorage.setItem(key, JSON.stringify([...set]));
 }
 
+/* -----------------------------
+   PROGRESS + ACCURACY
+----------------------------- */
 function updateProgress() {
-  const answered = getAnsweredSet();
-  const count = Math.min(answered.size, TOTAL_QUESTIONS);
-  const percent = (count / TOTAL_QUESTIONS) * 100;
+  const answered = getSet(answeredKey());
+  const correct = getSet(correctKey());
 
-  const bar = document.getElementById("progressBar");
-  const text = document.getElementById("progressText");
+  const progressBar = document.getElementById("progressBar");
+  const progressText = document.getElementById("progressText");
+  const accuracyText = document.getElementById("accuracyText");
 
-  if (bar) bar.style.width = percent + "%";
-  if (text) text.innerText = `Progress: ${count} / ${TOTAL_QUESTIONS}`;
+  if (progressBar) {
+    progressBar.style.width =
+      Math.min((answered.size / TOTAL_QUESTIONS) * 100, 100) + "%";
+  }
+
+  if (progressText) {
+    progressText.innerText = `Progress: ${answered.size} / ${TOTAL_QUESTIONS}`;
+  }
+
+  if (accuracyText) {
+    const accuracy =
+      answered.size === 0
+        ? 0
+        : Math.round((correct.size / answered.size) * 100);
+
+    accuracyText.innerText =
+      `Accuracy: ${accuracy}% (${correct.size} correct)`;
+  }
 }
 
-function markAnswered(qid) {
-  const answered = getAnsweredSet();
+function markAnswered(qid, isCorrect) {
+  const answered = getSet(answeredKey());
+  const correct = getSet(correctKey());
 
-  if (answered.has(qid)) return;
-  if (answered.size >= TOTAL_QUESTIONS) return;
+  if (!answered.has(qid) && answered.size < TOTAL_QUESTIONS) {
+    answered.add(qid);
+    saveSet(answeredKey(), answered);
+  }
 
-  answered.add(qid);
-  saveAnsweredSet(answered);
+  if (isCorrect) {
+    correct.add(qid);
+    saveSet(correctKey(), correct);
+  }
+
   updateProgress();
 }
 
 document.addEventListener("DOMContentLoaded", updateProgress);
 
 /* -----------------------------
-   TABLE RENDERER
+   TABLE RENDER (SQL STYLE)
 ----------------------------- */
-function renderResultTable(cols, rows) {
+function renderTable(cols, rows) {
   let html = "<table><tr>";
   cols.forEach(c => html += `<th>${c}</th>`);
   html += "</tr>";
 
-  if (!rows || rows.length === 0) {
-    html += `<tr><td colspan="${cols.length}">No data</td></tr>`;
-  } else {
-    rows.forEach(r => {
-      html += "<tr>";
-      r.forEach(v => html += `<td>${v}</td>`);
-      html += "</tr>";
-    });
-  }
+  rows.forEach(r => {
+    html += "<tr>";
+    r.forEach(v => html += `<td>${v}</td>`);
+    html += "</tr>";
+  });
 
   html += "</table>";
   return html;
@@ -86,30 +101,27 @@ function renderResultTable(cols, rows) {
    RUN QUERY
 ----------------------------- */
 async function runQuery() {
-  const sql = document.getElementById("sql").value.trim();
   const qid = document.getElementById("qid").value;
+  const sql = document.getElementById("sql").value;
   const out = document.getElementById("output");
-
-  if (!sql) {
-    out.innerHTML = "<p class='bad'>Please write a SQL query</p>";
-    return;
-  }
 
   out.innerHTML = "⏳ Running...";
 
   const res = await fetch("/run", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ user_sql: sql, qid })
+    body: new URLSearchParams({ qid, user_sql: sql })
   });
 
   const data = await res.json();
-  markAnswered(qid);
+  const isCorrect = data.status === "correct";
+
+  markAnswered(qid, isCorrect);
 
   out.innerHTML = `
-    <p>${data.status === "correct" ? "✅ Correct" : "❌ Wrong"}</p>
+    <p>${isCorrect ? "✅ Correct" : "❌ Wrong"}</p>
     <pre>${data.expected_sql}</pre>
-    ${renderResultTable(data.cols, data.rows)}
+    ${renderTable(data.cols, data.rows)}
   `;
 }
 
@@ -127,46 +139,41 @@ async function showAnswer() {
   });
 
   const data = await res.json();
-  markAnswered(qid);
+
+  // show answer ≠ correct
+  markAnswered(qid, false);
 
   out.innerHTML = `
     <h4>Correct Query</h4>
     <pre>${data.expected_sql}</pre>
-    ${renderResultTable(data.cols, data.rows)}
+    ${renderTable(data.cols, data.rows)}
   `;
 }
 
 /* -----------------------------
-   TABLE TOGGLE
+   SHOW AVAILABLE TABLES
 ----------------------------- */
 let tablesVisible = false;
 
 async function toggleTables() {
   const panel = document.getElementById("tablePanel");
-  const left = document.getElementById("leftPanel");
+  const info = document.getElementById("tableInfo");
 
   if (!tablesVisible) {
+    const res = await fetch("/tables");
+    const data = await res.json();
+
+    let html = "";
+    for (const [table, obj] of Object.entries(data)) {
+      html += `<h5>${table}</h5>`;
+      html += renderTable(obj.columns, obj.rows);
+    }
+
+    info.innerHTML = html;
     panel.style.display = "block";
-    left.style.width = "65%";
-    panel.style.width = "35%";
-    await loadTableInfo();
   } else {
     panel.style.display = "none";
-    left.style.width = "100%";
   }
+
   tablesVisible = !tablesVisible;
-}
-
-async function loadTableInfo() {
-  const res = await fetch("/tables");
-  const data = await res.json();
-
-  let html = "";
-  for (const name in data) {
-    html += `<h4>${name}</h4>`;
-    html += renderResultTable(data[name].columns, data[name].rows);
-    html += "<br>";
-  }
-
-  document.getElementById("tableInfo").innerHTML = html;
 }
