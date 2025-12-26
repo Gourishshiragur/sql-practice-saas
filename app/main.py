@@ -12,37 +12,33 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request, level: str = "easy", last_qid: str | None = None):
+def home(
+    request: Request,
+    level: str = "easy",
+    q_index: int = 0,
+):
     questions = QUESTIONS[level]
-    qids = [q["qid"] for q in questions]
 
-    # current index logic (UNCHANGED BEHAVIOR)
-    if last_qid and last_qid in qids:
-        index = qids.index(last_qid) + 1
-    else:
-        index = 0
+    if q_index < 0:
+        q_index = 0
+    if q_index >= len(questions):
+        q_index = len(questions) - 1
 
-    if index >= len(questions):
-        index = len(questions) - 1
-
-    q = questions[index]
-
-    # ✅ ADDITION: previous question id
-    prev_qid = qids[index - 1] if index > 0 else None
+    q = questions[q_index]
 
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "level": level,
+            "q_index": q_index,
             "q": {
                 "id": q["qid"],
                 "question": q["text"],
                 "hint": "Write the correct SQL query",
-                "number": index + 1,
+                "number": q_index + 1,
                 "total": len(questions),
             },
-            "prev_qid": prev_qid,  # 👈 NEW (safe)
         },
     )
 
@@ -52,7 +48,7 @@ def run_query(user_sql: str = Form(...), qid: str = Form(...)):
     for level in QUESTIONS:
         for q in QUESTIONS[level]:
             if q["qid"] == qid:
-                correct = q["expected_sql"].lower() == user_sql.strip().lower()
+                correct = q["expected_sql"].strip().lower() == user_sql.strip().lower()
                 return {
                     "status": "correct" if correct else "wrong",
                     "expected_sql": q["expected_sql"],

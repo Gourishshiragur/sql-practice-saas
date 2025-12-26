@@ -2,9 +2,6 @@ console.log("✅ app.js loaded");
 
 const TOTAL_QUESTIONS = 10;
 
-/* -----------------------------
-   LEVEL HELPERS
------------------------------ */
 function getLevel() {
   return new URLSearchParams(window.location.search).get("level") || "easy";
 }
@@ -18,70 +15,45 @@ function correctKey() {
 }
 
 function getSet(key) {
-  try {
-    return new Set(JSON.parse(sessionStorage.getItem(key) || "[]"));
-  } catch {
-    return new Set();
-  }
+  return new Set(JSON.parse(sessionStorage.getItem(key) || "[]"));
 }
 
 function saveSet(key, set) {
   sessionStorage.setItem(key, JSON.stringify([...set]));
 }
 
-/* -----------------------------
-   PROGRESS + ACCURACY
------------------------------ */
 function updateProgress() {
   const answered = getSet(answeredKey());
   const correct = getSet(correctKey());
 
-  const progressBar = document.getElementById("progressBar");
-  const progressText = document.getElementById("progressText");
-  const accuracyText = document.getElementById("accuracyText");
+  document.getElementById("progressBar").style.width =
+    Math.min((answered.size / TOTAL_QUESTIONS) * 100, 100) + "%";
 
-  if (progressBar) {
-    progressBar.style.width =
-      Math.min((answered.size / TOTAL_QUESTIONS) * 100, 100) + "%";
-  }
+  document.getElementById("progressText").innerText =
+    `Progress: ${answered.size} / ${TOTAL_QUESTIONS}`;
 
-  if (progressText) {
-    progressText.innerText = `Progress: ${answered.size} / ${TOTAL_QUESTIONS}`;
-  }
+  const accuracy =
+    answered.size === 0 ? 0 : Math.round((correct.size / answered.size) * 100);
 
-  if (accuracyText) {
-    const accuracy =
-      answered.size === 0
-        ? 0
-        : Math.round((correct.size / answered.size) * 100);
-
-    accuracyText.innerText =
-      `Accuracy: ${accuracy}% (${correct.size} correct)`;
-  }
+  document.getElementById("accuracyText").innerText =
+    `Accuracy: ${accuracy}% (${correct.size} correct)`;
 }
 
 function markAnswered(qid, isCorrect) {
   const answered = getSet(answeredKey());
   const correct = getSet(correctKey());
 
-  if (!answered.has(qid) && answered.size < TOTAL_QUESTIONS) {
-    answered.add(qid);
-    saveSet(answeredKey(), answered);
-  }
+  if (!answered.has(qid)) answered.add(qid);
+  if (isCorrect) correct.add(qid);
 
-  if (isCorrect) {
-    correct.add(qid);
-    saveSet(correctKey(), correct);
-  }
+  saveSet(answeredKey(), answered);
+  saveSet(correctKey(), correct);
 
   updateProgress();
 }
 
 document.addEventListener("DOMContentLoaded", updateProgress);
 
-/* -----------------------------
-   TABLE RENDER (SQL STYLE)
------------------------------ */
 function renderTable(cols, rows) {
   let html = "<table><tr>";
   cols.forEach(c => html += `<th>${c}</th>`);
@@ -93,19 +65,13 @@ function renderTable(cols, rows) {
     html += "</tr>";
   });
 
-  html += "</table>";
-  return html;
+  return html + "</table>";
 }
 
-/* -----------------------------
-   RUN QUERY
------------------------------ */
 async function runQuery() {
   const qid = document.getElementById("qid").value;
   const sql = document.getElementById("sql").value;
   const out = document.getElementById("output");
-
-  out.innerHTML = "⏳ Running...";
 
   const res = await fetch("/run", {
     method: "POST",
@@ -114,20 +80,17 @@ async function runQuery() {
   });
 
   const data = await res.json();
-  const isCorrect = data.status === "correct";
+  const correct = data.status === "correct";
 
-  markAnswered(qid, isCorrect);
+  markAnswered(qid, correct);
 
   out.innerHTML = `
-    <p>${isCorrect ? "✅ Correct" : "❌ Wrong"}</p>
+    <p>${correct ? "✅ Correct" : "❌ Wrong"}</p>
     <pre>${data.expected_sql}</pre>
     ${renderTable(data.cols, data.rows)}
   `;
 }
 
-/* -----------------------------
-   SHOW ANSWER
------------------------------ */
 async function showAnswer() {
   const qid = document.getElementById("qid").value;
   const out = document.getElementById("output");
@@ -140,7 +103,6 @@ async function showAnswer() {
 
   const data = await res.json();
 
-  // show answer ≠ correct
   markAnswered(qid, false);
 
   out.innerHTML = `
@@ -150,9 +112,6 @@ async function showAnswer() {
   `;
 }
 
-/* -----------------------------
-   SHOW AVAILABLE TABLES
------------------------------ */
 let tablesVisible = false;
 
 async function toggleTables() {
@@ -164,9 +123,9 @@ async function toggleTables() {
     const data = await res.json();
 
     let html = "";
-    for (const [table, obj] of Object.entries(data)) {
-      html += `<h5>${table}</h5>`;
-      html += renderTable(obj.columns, obj.rows);
+    for (const [name, t] of Object.entries(data)) {
+      html += `<h4>${name}</h4>`;
+      html += renderTable(t.columns, t.rows);
     }
 
     info.innerHTML = html;
