@@ -2,6 +2,9 @@ console.log("✅ app.js loaded");
 
 const TOTAL_QUESTIONS = 10;
 
+/* -----------------------------
+   LEVEL HELPERS
+----------------------------- */
 function getLevel() {
   return new URLSearchParams(window.location.search).get("level") || "easy";
 }
@@ -15,63 +18,114 @@ function correctKey() {
 }
 
 function getSet(key) {
-  return new Set(JSON.parse(sessionStorage.getItem(key) || "[]"));
+  try {
+    return new Set(JSON.parse(sessionStorage.getItem(key) || "[]"));
+  } catch {
+    return new Set();
+  }
 }
 
 function saveSet(key, set) {
   sessionStorage.setItem(key, JSON.stringify([...set]));
 }
 
+/* -----------------------------
+   PROGRESS + ACCURACY
+----------------------------- */
 function updateProgress() {
   const answered = getSet(answeredKey());
   const correct = getSet(correctKey());
 
-  document.getElementById("progressBar").style.width =
-    Math.min((answered.size / TOTAL_QUESTIONS) * 100, 100) + "%";
+  const progressBar = document.getElementById("progressBar");
+  const progressText = document.getElementById("progressText");
+  const accuracyText = document.getElementById("accuracyText");
 
-  document.getElementById("progressText").innerText =
-    `Progress: ${answered.size} / ${TOTAL_QUESTIONS}`;
+  const percent = Math.min((answered.size / TOTAL_QUESTIONS) * 100, 100);
 
-  const accuracy =
-    answered.size === 0 ? 0 : Math.round((correct.size / answered.size) * 100);
+  if (progressBar) progressBar.style.width = percent + "%";
 
-  document.getElementById("accuracyText").innerText =
-    `Accuracy: ${accuracy}% (${correct.size} correct)`;
+  if (progressText) {
+    progressText.innerText = `Progress: ${answered.size} / ${TOTAL_QUESTIONS}`;
+  }
+
+  if (accuracyText) {
+    const accuracy =
+      answered.size === 0
+        ? 0
+        : Math.round((correct.size / answered.size) * 100);
+
+    accuracyText.innerText =
+      `Accuracy: ${accuracy}% (${correct.size} correct out of ${answered.size})`;
+  }
 }
 
+/*
+  ✅ IMPORTANT FIX:
+  - Count each question ONLY ONCE
+  - Re-running same question does NOT change progress
+*/
 function markAnswered(qid, isCorrect) {
   const answered = getSet(answeredKey());
   const correct = getSet(correctKey());
 
-  if (!answered.has(qid)) answered.add(qid);
-  if (isCorrect) correct.add(qid);
+  // ❌ Already answered → do nothing
+  if (answered.has(qid)) {
+    updateProgress();
+    return;
+  }
 
+  // First-time answer
+  answered.add(qid);
   saveSet(answeredKey(), answered);
-  saveSet(correctKey(), correct);
+
+  if (isCorrect) {
+    correct.add(qid);
+    saveSet(correctKey(), correct);
+  }
 
   updateProgress();
 }
 
-document.addEventListener("DOMContentLoaded", updateProgress);
+document.addEventListener("DOMContentLoaded", () => {
+  updateProgress();
+  const panel = document.getElementById("tablePanel");
+  if (panel) panel.style.display = "none";
+});
 
+/* -----------------------------
+   TABLE RENDER
+----------------------------- */
 function renderTable(cols, rows) {
   let html = "<table><tr>";
-  cols.forEach(c => html += `<th>${c}</th>`);
+  cols.forEach(c => (html += `<th>${c}</th>`));
   html += "</tr>";
 
   rows.forEach(r => {
     html += "<tr>";
-    r.forEach(v => html += `<td>${v}</td>`);
+    r.forEach(v => (html += `<td>${v}</td>`));
     html += "</tr>";
   });
 
-  return html + "</table>";
+  html += "</table>";
+  return html;
 }
 
+/* -----------------------------
+   RUN QUERY
+----------------------------- */
 async function runQuery() {
   const qid = document.getElementById("qid").value;
-  const sql = document.getElementById("sql").value;
+  const sql = document.getElementById("sql").value.trim();
   const out = document.getElementById("output");
+
+  // ✅ FIX #1: Empty query validation
+  if (!sql) {
+    out.innerHTML =
+      `<p style="color:red">⚠️ Please enter a SQL query before clicking Run.</p>`;
+    return;
+  }
+
+  out.innerHTML = "⏳ Running...";
 
   const res = await fetch("/run", {
     method: "POST",
@@ -80,17 +134,20 @@ async function runQuery() {
   });
 
   const data = await res.json();
-  const correct = data.status === "correct";
+  const isCorrect = data.status === "correct";
 
-  markAnswered(qid, correct);
+  markAnswered(qid, isCorrect);
 
   out.innerHTML = `
-    <p>${correct ? "✅ Correct" : "❌ Wrong"}</p>
+    <p>${isCorrect ? "✅ Correct" : "❌ Wrong"}</p>
     <pre>${data.expected_sql}</pre>
     ${renderTable(data.cols, data.rows)}
   `;
 }
 
+/* -----------------------------
+   SHOW ANSWER
+----------------------------- */
 async function showAnswer() {
   const qid = document.getElementById("qid").value;
   const out = document.getElementById("output");
@@ -103,6 +160,7 @@ async function showAnswer() {
 
   const data = await res.json();
 
+  // ❌ "I don’t know" counts as answered but NOT correct
   markAnswered(qid, false);
 
   out.innerHTML = `
@@ -112,26 +170,32 @@ async function showAnswer() {
   `;
 }
 
+/* -----------------------------
+   SHOW AVAILABLE TABLES
+----------------------------- */
 let tablesVisible = false;
 
 async function toggleTables() {
   const panel = document.getElementById("tablePanel");
   const info = document.getElementById("tableInfo");
+  const left = document.querySelector(".left");
 
   if (!tablesVisible) {
     const res = await fetch("/tables");
     const data = await res.json();
 
     let html = "";
-    for (const [name, t] of Object.entries(data)) {
-      html += `<h4>${name}</h4>`;
-      html += renderTable(t.columns, t.rows);
+    for (const [table, obj] of Object.entries(data)) {
+      html += `<h5>${table}</h5>`;
+      html += renderTable(obj.columns, obj.rows);
     }
 
     info.innerHTML = html;
     panel.style.display = "block";
+    if (left) left.style.width = "65%";
   } else {
     panel.style.display = "none";
+    if (left) left.style.width = "100%";
   }
 
   tablesVisible = !tablesVisible;
