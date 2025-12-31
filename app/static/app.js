@@ -6,6 +6,9 @@ let recognition = null;
 let newYearGreetingPending = false;
 
 /* ================= VOICE INIT ================= */
+function isMobileDevice() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
 
 if (window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => {
@@ -212,7 +215,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const today = new Date();
   const isNewYear = today.getDate() === 1 && today.getMonth() === 0;
 
-  if (isNewYear && !sessionStorage.getItem("newYearGreeted")) {
-    newYearGreetingPending = true;
+  // Banner already handled by HTML (visible)
+  if (!isNewYear) return;
+
+  // 🎉 MOBILE: try auto voice greeting ONCE
+  if (isMobileDevice() && !sessionStorage.getItem("newYearGreeted")) {
+    sessionStorage.setItem("newYearGreeted", "true");
+
+    try {
+      speak("Happy New Year! Welcome to SQL Practice.", "en-IN");
+    } catch (e) {
+      // silently fail (browser may block)
+    }
   }
 });
+
