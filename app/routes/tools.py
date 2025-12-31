@@ -5,8 +5,7 @@ import os
 import logging
 from dotenv import load_dotenv
 
-# 🔒 FORCE LOAD .env HERE (DO NOT RELY ON main.py)
-load_dotenv(override=True)
+
 
 router = APIRouter(prefix="/ai")
 logging.basicConfig(level=logging.INFO)
