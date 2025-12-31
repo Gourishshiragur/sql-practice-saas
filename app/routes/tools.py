@@ -3,9 +3,6 @@ from pydantic import BaseModel
 from groq import Groq
 import os
 import logging
-from dotenv import load_dotenv
-
-
 
 router = APIRouter(prefix="/ai")
 logging.basicConfig(level=logging.INFO)
