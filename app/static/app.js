@@ -1,219 +1,257 @@
 console.log("✅ app.js loaded");
-
-const TOTAL_QUESTIONS = 10;
-
-/* -----------------------------
-   LEVEL HELPERS
------------------------------ */
-function getLevel() {
-  return new URLSearchParams(window.location.search).get("level") || "easy";
+// Ensure voices are loaded (important for Chrome/Edge)
+if (window.speechSynthesis) {
+  window.speechSynthesis.onvoiceschanged = () => {
+    speechSynthesis.getVoices();
+  };
 }
 
-function answeredKey() {
-  return "answered_" + getLevel();
-}
+/* ================= UTIL ================= */
 
-function correctKey() {
-  return "correct_" + getLevel();
-}
-
-function getSet(key) {
-  try {
-    return new Set(JSON.parse(sessionStorage.getItem(key) || "[]"));
-  } catch {
-    return new Set();
-  }
-}
-
-function saveSet(key, set) {
-  sessionStorage.setItem(key, JSON.stringify([...set]));
-}
-
-/* -----------------------------
-   COMPLETION MESSAGE
------------------------------ */
-function showCompletionMessage() {
-  const out = document.getElementById("output");
-
-  out.innerHTML = `
-    <p style="color:green; font-weight:600;">
-      🎉 You have completed all questions for this level. Try the next level.
-    </p>
-  `;
-}
-
-/* -----------------------------
-   PROGRESS + ACCURACY
------------------------------ */
-function updateProgress() {
-  const answered = getSet(answeredKey());
-  const correct = getSet(correctKey());
-
-  const progressBar = document.getElementById("progressBar");
-  const progressText = document.getElementById("progressText");
-  const accuracyText = document.getElementById("accuracyText");
-
-  const percent = Math.min((answered.size / TOTAL_QUESTIONS) * 100, 100);
-
-  if (progressBar) progressBar.style.width = percent + "%";
-
-  if (progressText) {
-    progressText.innerText =
-      `Progress: ${answered.size} / ${TOTAL_QUESTIONS}`;
-  }
-
-  if (accuracyText) {
-    const accuracy =
-      answered.size === 0
-        ? 0
-        : Math.round((correct.size / answered.size) * 100);
-
-    accuracyText.innerText =
-      `Accuracy: ${accuracy}% (${correct.size} correct out of ${answered.size})`;
-  }
-}
-
-/*
-  ✅ Count each question ONLY ONCE
-  ✅ Trigger completion exactly at 10/10
-*/
-function markAnswered(qid, isCorrect) {
-  const answered = getSet(answeredKey());
-  const correct = getSet(correctKey());
-
-  // Already answered → no re-count
-  if (answered.has(qid)) {
-    updateProgress();
-    return;
-  }
-
-  answered.add(qid);
-  saveSet(answeredKey(), answered);
-
-  if (isCorrect) {
-    correct.add(qid);
-    saveSet(correctKey(), correct);
-  }
-
-  updateProgress();
-
-  // ✅ Completion trigger (reliable)
-  if (answered.size === TOTAL_QUESTIONS) {
-    showCompletionMessage();
-  }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  updateProgress();
-
-  const panel = document.getElementById("tablePanel");
-  if (panel) panel.style.display = "none";
-});
-
-/* -----------------------------
-   TABLE RENDER
------------------------------ */
 function renderTable(cols, rows) {
   let html = "<table><tr>";
-  cols.forEach(c => (html += `<th>${c}</th>`));
+  cols.forEach(c => html += `<th>${c}</th>`);
   html += "</tr>";
 
   rows.forEach(r => {
     html += "<tr>";
-    r.forEach(v => (html += `<td>${v}</td>`));
+    r.forEach(v => html += `<td>${v}</td>`);
     html += "</tr>";
   });
 
   return html + "</table>";
 }
 
-/* -----------------------------
-   RUN QUERY
------------------------------ */
-async function runQuery() {
-  const qid = document.getElementById("qid").value;
-  const sql = document.getElementById("sql").value.trim();
-  const out = document.getElementById("output");
+function formatForDisplay(text) {
+  if (!text) return "";
+  return text
+    .replace(/\\n/g, "\n")
+    .replace(/\n/g, "<br>");
+}
 
-  // ✅ Empty query guard
-  if (!sql) {
-    out.innerHTML =
-      `<p style="color:red">⚠️ Please enter a SQL query before clicking Run.</p>`;
+/* ================= SQL ================= */
+
+window.toggleTables = async function () {
+  console.log("toggleTables clicked");
+
+  const panel = document.getElementById("tablePanel");
+  const info = document.getElementById("tableInfo");
+  const left = document.querySelector(".left");
+
+  if (!panel || !info) return;
+
+  if (panel.style.display === "block") {
+    panel.style.display = "none";
+    if (left) left.style.width = "100%";
     return;
   }
 
-  out.innerHTML = "⏳ Running...";
+  const res = await fetch("/tables");
+  const data = await res.json();
+
+  let html = "";
+  for (const [table, obj] of Object.entries(data)) {
+    html += `<h4>${table}</h4>`;
+    html += renderTable(obj.columns, obj.rows);
+  }
+
+  info.innerHTML = html;
+  panel.style.display = "block";
+  if (left) left.style.width = "65%";
+};
+
+window.runQuery = async function () {
+  console.log("runQuery clicked");
+
+  const qidEl = document.getElementById("qid");
+  const sqlEl = document.getElementById("sql");
+  const out = document.getElementById("output");
+  if (!qidEl || !sqlEl || !out) return;
+
+  const sql = sqlEl.value.trim();
+  if (!sql) {
+    out.innerText = "Enter SQL query";
+    return;
+  }
 
   const res = await fetch("/run", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ qid, user_sql: sql })
+    body: new URLSearchParams({ qid: qidEl.value, user_sql: sql })
   });
 
   const data = await res.json();
-  const isCorrect = data.status === "correct";
-
-  markAnswered(qid, isCorrect);
-
   out.innerHTML = `
-    <p>${isCorrect ? "✅ Correct" : "❌ Wrong"}</p>
+    <b>${data.status === "correct" ? "✅ Correct" : "❌ Wrong"}</b>
     <pre>${data.expected_sql}</pre>
     ${renderTable(data.cols, data.rows)}
   `;
-}
+};
 
-/* -----------------------------
-   SHOW ANSWER
------------------------------ */
-async function showAnswer() {
-  const qid = document.getElementById("qid").value;
+window.showAnswer = async function () {
+  console.log("showAnswer clicked");
+
+  const qidEl = document.getElementById("qid");
   const out = document.getElementById("output");
+  if (!qidEl || !out) return;
 
   const res = await fetch("/show-answer", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ qid })
+    body: new URLSearchParams({ qid: qidEl.value })
   });
 
   const data = await res.json();
-
-  // Counts as answered but NOT correct
-  markAnswered(qid, false);
-
   out.innerHTML = `
     <h4>Correct Query</h4>
     <pre>${data.expected_sql}</pre>
     ${renderTable(data.cols, data.rows)}
   `;
-}
+};
 
-/* -----------------------------
-   SHOW AVAILABLE TABLES
------------------------------ */
-let tablesVisible = false;
+/* ================= AI (TEXT ONLY) ================= */
 
-async function toggleTables() {
-  const panel = document.getElementById("tablePanel");
-  const info = document.getElementById("tableInfo");
-  const left = document.querySelector(".left");
+window.askAIMentor = function () {
+  console.log("askAIMentor clicked");
 
-  if (!tablesVisible) {
-    const res = await fetch("/tables");
-    const data = await res.json();
+  const input = document.getElementById("aiInput");
+  const out = document.getElementById("aiOutput");
+  if (!input || !out) return;
 
-    let html = "";
-    for (const [table, obj] of Object.entries(data)) {
-      html += `<h5>${table}</h5>`;
-      html += renderTable(obj.columns, obj.rows);
-    }
-
-    info.innerHTML = html;
-    panel.style.display = "block";
-    if (left) left.style.width = "65%";
-  } else {
-    panel.style.display = "none";
-    if (left) left.style.width = "100%";
+  const text = input.value.trim();
+  if (!text) {
+    out.innerText = "Please type your question or use 🎤 Speak";
+    return;
   }
 
-  tablesVisible = !tablesVisible;
+  fetch("/ai/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: text })
+  })
+    .then(res => res.text())
+    .then(reply => {
+      out.innerHTML = formatForDisplay(reply);
+    });
+};
+
+/* ================= VOICE ================= */
+
+let lastSpokenLang = "en-US";
+
+function detectLanguage(text) {
+  if (/[\u0C80-\u0CFF]/.test(text)) return "kn-IN";
+  if (/[\u0900-\u097F]/.test(text)) return "hi-IN";
+  return "en-US";
 }
+
+function speak(text, lang) {
+  if (!window.speechSynthesis) return;
+
+  // Clean text (important)
+  const cleanText = text
+    .replace(/\\n/g, " ")
+    .replace(/\n/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const utter = new SpeechSynthesisUtterance(cleanText);
+  const voices = speechSynthesis.getVoices();
+
+  let selectedVoice = null;
+
+  // 1️⃣ Try FEMALE Indian Kannada
+  if (lang === "kn-IN") {
+    selectedVoice = voices.find(v =>
+      v.lang === "kn-IN" &&
+      /female|woman|zira|heera|kavya|siri/i.test(v.name)
+    );
+  }
+
+  // 2️⃣ Try FEMALE Indian Hindi
+  if (!selectedVoice && lang === "hi-IN") {
+    selectedVoice = voices.find(v =>
+      v.lang === "hi-IN" &&
+      /female|woman|swara|zira|heera/i.test(v.name)
+    );
+  }
+
+  // 3️⃣ Try ANY Indian female
+  if (!selectedVoice) {
+    selectedVoice = voices.find(v =>
+      v.lang.startsWith("en-IN") &&
+      /female|woman/i.test(v.name)
+    );
+  }
+
+  // 4️⃣ Fallback: any Indian voice
+  if (!selectedVoice) {
+    selectedVoice = voices.find(v =>
+      v.lang.startsWith(lang.split("-")[0])
+    );
+  }
+
+  // 5️⃣ Final fallback: English female
+  if (!selectedVoice) {
+    selectedVoice = voices.find(v =>
+      v.lang.startsWith("en") &&
+      /female|woman/i.test(v.name)
+    );
+  }
+
+  if (!selectedVoice) {
+    console.warn("No suitable voice found, skipping speech");
+    return;
+  }
+
+  utter.voice = selectedVoice;
+  utter.lang = selectedVoice.lang;
+  utter.rate = 1;
+  utter.pitch = 1;
+
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utter);
+}
+
+
+window.startVoiceInput = function () {
+  console.log("startVoiceInput clicked");
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    alert("Voice not supported");
+    return;
+  }
+
+  const micBtn = document.getElementById("micBtn");
+  micBtn.classList.add("listening");
+  micBtn.innerText = "🎤 Listening...";
+
+  const recog = new SR();
+  recog.lang = "en-IN";
+
+  recog.onresult = e => {
+    const text = e.results[0][0].transcript;
+    document.getElementById("aiInput").value = text;
+    lastSpokenLang = detectLanguage(text);
+
+    fetch("/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text })
+    })
+      .then(res => res.text())
+      .then(reply => {
+        const out = document.getElementById("aiOutput");
+        out.innerHTML = formatForDisplay(reply);
+        speak(reply, lastSpokenLang);
+      });
+  };
+
+  recog.onend = () => {
+    micBtn.classList.remove("listening");
+    micBtn.innerText = "🎤 Speak";
+  };
+
+  recog.start();
+};
