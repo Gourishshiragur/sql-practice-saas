@@ -30,8 +30,12 @@ function setSpeakListening(active) {
 
 function stopAllVoice() {
   if (recognition) {
-    try { recognition.stop(); } catch {}
-  }
+    try {
+  recognition.stop();
+} catch (e) {
+  console.warn("recognition stop failed");
+}
+
   if (window.speechSynthesis) {
     speechSynthesis.cancel();
   }
