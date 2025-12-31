@@ -16,6 +16,7 @@ function setSpeakListening(active) {
   }
 }
 
+
 if (window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => {
     speechSynthesis.getVoices();
@@ -174,6 +175,22 @@ window.askAIMentor = function () {
   const text = input.value.trim();
   if (!text) return;
 
+  // ✅ NEW: Greeting when Ask is clicked without input
+  if (!text) {
+    out.innerHTML = `
+      👋 <b>Hi! Welcome to SQL Practice.</b><br><br>
+      This app helps you practice <b>real interview-level SQL questions</b>, 
+      understand table data, and get instant feedback on your queries.<br><br>
+      💡 You can:
+      <ul>
+        <li>Write and run SQL queries</li>
+        <li>Ask doubts using text</li>
+        <li>Use <b>🎤 Speak</b> to talk and get voice responses</li>
+      </ul>
+      👉 Try clicking <b>🎤 Speak</b> and ask your question by voice!
+    `;
+    return;
+  }
   if (tryPlayYouTube(text)) return;
 
   fetch("/ai/chat", {
@@ -219,7 +236,7 @@ utter.onend = () => {
 
 /* ================= MIC (SPEAK BUTTON) ================= */
 
-wwindow.startVoiceInput = function () {
+window.startVoiceInput = function () {
   // toggle: if already listening or speaking → stop
   if (isListening || isSpeaking) {
     if (window.speechSynthesis) speechSynthesis.cancel();
