@@ -1,7 +1,7 @@
 console.log("✅ app.js loaded");
 let isSpeaking = false;
 
-// Ensure voices are loaded (important for Chrome/Edge)
+// Ensure voices are loaded
 if (window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => {
     speechSynthesis.getVoices();
@@ -31,16 +31,12 @@ function formatForDisplay(text) {
     .replace(/\n/g, "<br>");
 }
 
-
 /* ================= SQL ================= */
 
 window.toggleTables = async function () {
-  console.log("toggleTables clicked");
-
   const panel = document.getElementById("tablePanel");
   const info = document.getElementById("tableInfo");
   const left = document.querySelector(".left");
-
   if (!panel || !info) return;
 
   if (panel.style.display === "block") {
@@ -64,8 +60,6 @@ window.toggleTables = async function () {
 };
 
 window.runQuery = async function () {
-  console.log("runQuery clicked");
-
   const qidEl = document.getElementById("qid");
   const sqlEl = document.getElementById("sql");
   const out = document.getElementById("output");
@@ -92,8 +86,6 @@ window.runQuery = async function () {
 };
 
 window.showAnswer = async function () {
-  console.log("showAnswer clicked");
-
   const qidEl = document.getElementById("qid");
   const out = document.getElementById("output");
   if (!qidEl || !out) return;
@@ -112,60 +104,46 @@ window.showAnswer = async function () {
   `;
 };
 
-/* ================= AI (TEXT ONLY) ================= */
+/* ================= YOUTUBE AUTO PLAY ================= */
+
 function tryPlayYouTube(text) {
   const lower = text.toLowerCase();
 
   if (!lower.startsWith("play")) return false;
 
-  let song = lower
-    .replace(/^play/, "")
-    .replace("this song", "")
-    .replace("song", "")
+  let query = text
+    .replace(/play/gi, "")
+    .replace(/song/gi, "")
+    .replace(/music/gi, "")
     .trim();
 
-  if (!song) {
-    const out = document.getElementById("aiOutput");
-    out.innerText = "🎵 Which song should I play?";
-    speak("Which song should I play?", "en-US");
-    return true;
-  }
+  if (!query) query = "music";
 
-  showYouTubePlayButton(song);
+  const url =
+    "https://www.youtube.com/results?search_query=" +
+    encodeURIComponent(query);
+
+  window.open(url, "_blank");
+
+  const out = document.getElementById("aiOutput");
+  if (out) out.innerText = "🎵 Opening YouTube…";
+
+  speak("Opening YouTube", "en-US");
   return true;
 }
 
-function showYouTubePlayButton(songText) {
-  const out = document.getElementById("aiOutput");
-
-  const query = encodeURIComponent(songText);
-
-  out.innerHTML = `
-    🎵 Ready to play: <b>${songText}</b><br><br>
-    <button onclick="window.open(
-      'https://www.youtube.com/results?search_query=${query}',
-      '_blank'
-    )">
-      ▶️ Open YouTube
-    </button>
-  `;
-
-  // Speak ONLY in English (reliable)
-  speak("Opening YouTube. Tap the play button.", "en-US");
-}
+/* ================= AI (TEXT) ================= */
 
 window.askAIMentor = function () {
-  console.log("askAIMentor clicked");
-
   const input = document.getElementById("aiInput");
   const out = document.getElementById("aiOutput");
   if (!input || !out) return;
 
   const text = input.value.trim();
-  if (!text) {
-    out.innerText = "Please type your question or use 🎤 Speak";
-    return;
-  }
+  if (!text) return;
+
+  // 🎵 YouTube first
+  if (tryPlayYouTube(text)) return;
 
   fetch("/ai/chat", {
     method: "POST",
@@ -173,11 +151,9 @@ window.askAIMentor = function () {
     body: JSON.stringify({ message: text })
   })
     .then(res => res.text())
-  .then(reply => {
-  if (tryPlayYouTube(text)) return;   // 👈 ADD THIS
-  out.innerHTML = formatForDisplay(reply);
-});
-
+    .then(reply => {
+      out.innerHTML = formatForDisplay(reply);
+    });
 };
 
 /* ================= VOICE ================= */
@@ -189,71 +165,41 @@ function detectLanguage(text) {
   if (/[\u0900-\u097F]/.test(text)) return "hi-IN";
   return "en-US";
 }
-function cleanForSpeech(text) {
-  if (!text) return "";
 
+function cleanForSpeech(text) {
   return text
-    .replace(/\\"/g, '"')     // remove escaped quotes
-    .replace(/\\'/g, "'")     // remove escaped apostrophes
-    .replace(/\\n/g, " ")     // remove literal \n
-    .replace(/\n/g, " ")      // remove real newlines
-    .replace(/\s+/g, " ")     // normalize spaces
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, " ")
+    .replace(/\n/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
 function speak(text, lang) {
   if (!window.speechSynthesis) return;
-
-  // 🛑 Stop any previous speech
   speechSynthesis.cancel();
 
-  const cleanText = cleanForSpeech(text);
-  if (!cleanText) return;
-
-  const utter = new SpeechSynthesisUtterance(cleanText);
+  const utter = new SpeechSynthesisUtterance(cleanForSpeech(text));
   const voices = speechSynthesis.getVoices();
 
-  let voice =
+  utter.voice =
     voices.find(v => v.lang === lang) ||
     voices.find(v => v.lang.startsWith(lang.split("-")[0])) ||
     voices.find(v => v.lang.startsWith("en"));
 
-  if (!voice) return;
+  if (!utter.voice) return;
 
-  utter.voice = voice;
-  utter.lang = voice.lang;
-  utter.rate = 1;
-  utter.pitch = 1;
-
-  const stopBtn = document.getElementById("stopBtn");
-
-  utter.onstart = () => {
-    isSpeaking = true;
-    if (stopBtn) stopBtn.style.display = "inline-block";
-  };
-
-  utter.onend = utter.onerror = () => {
-    isSpeaking = false;
-    if (stopBtn) stopBtn.style.display = "none";
-  };
+  utter.onstart = () => isSpeaking = true;
+  utter.onend = () => isSpeaking = false;
 
   speechSynthesis.speak(utter);
 }
 
-
-
 window.startVoiceInput = function () {
-  console.log("startVoiceInput clicked");
+  speechSynthesis.cancel();
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    alert("Voice not supported");
-    return;
-  }
-
-  const micBtn = document.getElementById("micBtn");
-  micBtn.classList.add("listening");
-  micBtn.innerText = "🎤 Listening...";
+  if (!SR) return;
 
   const recog = new SR();
   recog.lang = "en-IN";
@@ -263,35 +209,21 @@ window.startVoiceInput = function () {
     document.getElementById("aiInput").value = text;
     lastSpokenLang = detectLanguage(text);
 
+    // 🎵 YouTube first
+    if (tryPlayYouTube(text)) return;
+
     fetch("/ai/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: text })
     })
       .then(res => res.text())
-     .then(reply => {
-  if (tryPlayYouTube(text)) return;   // 👈 ADD THIS
-
-   const out = document.getElementById("aiOutput");
-   out.innerHTML = formatForDisplay(reply);
-    speak(reply, lastSpokenLang);
-    });
-
-  };
-
-  recog.onend = () => {
-    micBtn.classList.remove("listening");
-    micBtn.innerText = "🎤 Speak";
+      .then(reply => {
+        const out = document.getElementById("aiOutput");
+        out.innerHTML = formatForDisplay(reply);
+        speak(reply, lastSpokenLang);
+      });
   };
 
   recog.start();
-};
-window.stopSpeaking = function () {
-  if (window.speechSynthesis && isSpeaking) {
-    speechSynthesis.cancel();
-  }
-
-  isSpeaking = false;
-  const stopBtn = document.getElementById("stopBtn");
-  if (stopBtn) stopBtn.style.display = "none";
 };
