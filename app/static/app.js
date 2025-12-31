@@ -112,7 +112,6 @@ window.showAnswer = async function () {
 /* ================= AI (TEXT ONLY) ================= */
 function tryPlayYouTube(text) {
   const lower = text.toLowerCase();
-  const out = document.getElementById("aiOutput");
 
   if (!lower.startsWith("play")) return false;
 
@@ -123,21 +122,33 @@ function tryPlayYouTube(text) {
     .trim();
 
   if (!song) {
+    const out = document.getElementById("aiOutput");
     out.innerText = "🎵 Which song should I play?";
     speak("Which song should I play?", "en-US");
     return true;
   }
 
-  out.innerText = `🎵 Playing "${song}" on YouTube`;
-  speak(`Playing ${song}`, detectLanguage(song));
-
-  window.open(
-    "https://www.youtube.com/results?search_query=" +
-      encodeURIComponent(song),
-    "_blank"
-  );
-
+  showYouTubePlayButton(song);
   return true;
+}
+
+function showYouTubePlayButton(songText) {
+  const out = document.getElementById("aiOutput");
+
+  const query = encodeURIComponent(songText);
+
+  out.innerHTML = `
+    🎵 Ready to play: <b>${songText}</b><br><br>
+    <button onclick="window.open(
+      'https://www.youtube.com/results?search_query=${query}',
+      '_blank'
+    )">
+      ▶️ Open YouTube
+    </button>
+  `;
+
+  // Speak ONLY in English (reliable)
+  speak("Opening YouTube. Tap the play button.", "en-US");
 }
 
 window.askAIMentor = function () {
