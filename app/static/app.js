@@ -251,7 +251,20 @@ document.addEventListener("DOMContentLoaded", function () {
   const d = new Date();
   const isNewYear = d.getDate() === 1 && d.getMonth() === 0;
 
-  if (isNewYear && isMobileDevice() && !sessionStorage.getItem("newYearGreeted")) {
-    newYearGreetingPending = true;
+  if (!isNewYear) return;
+
+  // 📱 Mobile auto-greet attempt (safe)
+  if (isMobileDevice() && !sessionStorage.getItem("newYearGreeted")) {
+    sessionStorage.setItem("newYearGreeted", "true");
+
+    // ⏱ small delay lets WebView / PWA settle
+    setTimeout(function () {
+      try {
+        speak("Happy New Year! Welcome to SQL Practice.");
+      } catch (e) {
+        // silently ignore if browser blocks
+      }
+    }, 300);
   }
 });
+
