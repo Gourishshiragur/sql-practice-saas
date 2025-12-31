@@ -81,19 +81,18 @@ function speak(text) {
   const utter = new SpeechSynthesisUtterance(cleanForSpeech(text));
   utter.lang = "en-IN";
 
-  utter.onstart = () => {
+  utter.onstart = function () {
     isSpeaking = true;
     setSpeakListening(true);
   };
 
-  utter.onend = () => {
+  utter.onend = function () {
     isSpeaking = false;
     setSpeakListening(false);
   };
 
   speechSynthesis.speak(utter);
 }
-git 
 
 /* ================= SQL ================= */
 
