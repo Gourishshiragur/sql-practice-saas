@@ -110,6 +110,35 @@ window.showAnswer = async function () {
 };
 
 /* ================= AI (TEXT ONLY) ================= */
+function tryPlayYouTube(text) {
+  const lower = text.toLowerCase();
+  const out = document.getElementById("aiOutput");
+
+  if (!lower.startsWith("play")) return false;
+
+  let song = lower
+    .replace(/^play/, "")
+    .replace("this song", "")
+    .replace("song", "")
+    .trim();
+
+  if (!song) {
+    out.innerText = "🎵 Which song should I play?";
+    speak("Which song should I play?", "en-US");
+    return true;
+  }
+
+  out.innerText = `🎵 Playing "${song}" on YouTube`;
+  speak(`Playing ${song}`, detectLanguage(song));
+
+  window.open(
+    "https://www.youtube.com/results?search_query=" +
+      encodeURIComponent(song),
+    "_blank"
+  );
+
+  return true;
+}
 
 window.askAIMentor = function () {
   console.log("askAIMentor clicked");
@@ -130,9 +159,11 @@ window.askAIMentor = function () {
     body: JSON.stringify({ message: text })
   })
     .then(res => res.text())
-    .then(reply => {
-      out.innerHTML = formatForDisplay(reply);
-    });
+  .then(reply => {
+  if (tryPlayYouTube(text)) return;   // 👈 ADD THIS
+  out.innerHTML = formatForDisplay(reply);
+});
+
 };
 
 /* ================= VOICE ================= */
@@ -241,11 +272,14 @@ window.startVoiceInput = function () {
       body: JSON.stringify({ message: text })
     })
       .then(res => res.text())
-      .then(reply => {
-        const out = document.getElementById("aiOutput");
-        out.innerHTML = formatForDisplay(reply);
-        speak(reply, lastSpokenLang);
-      });
+     .then(reply => {
+  if (tryPlayYouTube(text)) return;   // 👈 ADD THIS
+
+   const out = document.getElementById("aiOutput");
+   out.innerHTML = formatForDisplay(reply);
+    speak(reply, lastSpokenLang);
+    });
+
   };
 
   recog.onend = () => {
