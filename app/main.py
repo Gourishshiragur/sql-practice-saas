@@ -1,12 +1,13 @@
-from dotenv import load_dotenv
+
 from fastapi import FastAPI, Request, Form
+
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from app.questions import QUESTIONS
 from app.routes.tools import router as tools_router
 
-load_dotenv()
+
 
 # =========================
 # APP SETUP
@@ -44,6 +45,27 @@ def home(request: Request, level: str = "easy", q_index: int = 0):
 # =========================
 # SQL CHECK
 # =========================
+@app.get("/tables")
+def tables():
+    return {
+        "employees": {
+            "columns": ["id", "name", "department_id", "salary", "hire_date"],
+            "rows": [
+                [1, "Alice", 1, 60000, "2021-03-01"],
+                [2, "Bob", 2, 45000, "2020-07-15"],
+                [3, "Charlie", 1, 70000, "2019-11-20"],
+            ],
+        },
+        "departments": {
+            "columns": ["id", "department_name", "location"],
+            "rows": [
+                [1, "IT", "Bangalore"],
+                [2, "HR", "Mumbai"],
+                [3, "Finance", "Delhi"],
+            ],
+        }
+    }
+
 @app.post("/run")
 def run_query(user_sql: str = Form(...), qid: str = Form(...)):
     for level in QUESTIONS:
