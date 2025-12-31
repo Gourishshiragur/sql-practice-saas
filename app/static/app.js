@@ -207,32 +207,24 @@ window.askAIMentor = function () {
 /* ================= SPEECH ================= */
 
 function speak(text, lang) {
-  stopAllVoice();
+  if (!window.speechSynthesis) return;
 
-  const utter = new SpeechSynthesisUtterance(text);
+  const utter = new SpeechSynthesisUtterance(cleanForSpeech(text));
   utter.lang = lang || "en-IN";
-utter.onstart = () => {
-  isSpeaking = true;
-  setSpeakListening(true);
-};
-
-utter.onend = () => {
-  isSpeaking = false;
-  setSpeakListening(false);
-};
 
   utter.onstart = () => {
     isSpeaking = true;
-    setSpeakButtonState(true);
+    setSpeakListening(true);   // 🔴 red button
   };
 
   utter.onend = () => {
     isSpeaking = false;
-    setSpeakButtonState(false);
+    setSpeakListening(false);  // ⚪ normal
   };
 
   speechSynthesis.speak(utter);
 }
+
 
 /* ================= MIC (SPEAK BUTTON) ================= */
 
@@ -256,24 +248,29 @@ window.startVoiceInput = function () {
   isListening = true;
   setSpeakListening(true);
 
-  recognition.onresult = e => {
-    const text = e.results[0][0].transcript;
-    document.getElementById("aiInput").value = text;
+ recognition.onresult = e => {
+  const text = e.results[0][0].transcript;
+  document.getElementById("aiInput").value = text;
 
-    if (tryPlayYouTube(text)) return;
+  if (tryPlayYouTube(text)) return;
 
-    fetch("/ai/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text })
-    })
-      .then(res => res.text())
-      .then(reply => {
-        const out = document.getElementById("aiOutput");
-        out.innerHTML = formatForDisplay(reply);
-        speak(reply, detectLanguage(text));
-      });
-  };
+  fetch("/ai/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: text })
+  })
+    .then(res => res.text())
+    .then(reply => {
+      const out = document.getElementById("aiOutput");
+      out.innerHTML = formatForDisplay(reply);
+
+      // ✅ FORCE VOICE OUTPUT (THIS WAS MISSING / BROKEN)
+      setTimeout(() => {
+        speak(reply, detectLanguage(reply));
+      }, 100);
+    });
+};
+
 
   recognition.onend = () => {
     isListening = false;
