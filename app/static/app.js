@@ -1,21 +1,11 @@
 console.log("✅ app.js loaded");
 
-let isSpeaking = false;
 let isListening = false;
+let isSpeaking = false;
 let recognition = null;
+let newYearGreetingPending = false;
 
 /* ================= VOICE INIT ================= */
-function setSpeakListening(active) {
-  const btn = document.getElementById("speakBtn");
-  if (!btn) return;
-
-  if (active) {
-    btn.classList.add("listening");
-  } else {
-    btn.classList.remove("listening");
-  }
-}
-
 
 if (window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => {
@@ -23,31 +13,28 @@ if (window.speechSynthesis) {
   };
 }
 
-/* ================= SPEAK BUTTON UI ================= */
+/* ================= SPEAK BUTTON STATE ================= */
 
-function setSpeakButtonState(active) {
+function setSpeakListening(active) {
   const btn = document.getElementById("speakBtn");
   if (!btn) return;
 
-  if (active) {
-    btn.style.backgroundColor = "red";
-    btn.style.color = "white";
-  } else {
-    btn.style.backgroundColor = "";
-    btn.style.color = "";
-  }
+  if (active) btn.classList.add("listening");
+  else btn.classList.remove("listening");
 }
 
+/* ================= STOP ALL ================= */
+
 function stopAllVoice() {
+  if (recognition) {
+    try { recognition.stop(); } catch {}
+  }
   if (window.speechSynthesis) {
     speechSynthesis.cancel();
   }
-  if (recognition && isListening) {
-    recognition.stop();
-  }
-  isSpeaking = false;
   isListening = false;
-  setSpeakButtonState(false);
+  isSpeaking = false;
+  setSpeakListening(false);
 }
 
 /* ================= UTIL ================= */
@@ -56,13 +43,11 @@ function renderTable(cols, rows) {
   let html = "<table><tr>";
   cols.forEach(c => html += `<th>${c}</th>`);
   html += "</tr>";
-
   rows.forEach(r => {
     html += "<tr>";
     r.forEach(v => html += `<td>${v}</td>`);
     html += "</tr>";
   });
-
   return html + "</table>";
 }
 
@@ -73,78 +58,36 @@ function formatForDisplay(text) {
     .replace(/\n/g, "<br>");
 }
 
-/* ================= SQL ================= */
+function cleanForSpeech(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
 
-window.toggleTables = async function () {
-  const panel = document.getElementById("tablePanel");
-  const info = document.getElementById("tableInfo");
-  const left = document.querySelector(".left");
-  if (!panel || !info) return;
+function detectLanguage(text) {
+  if (/[\u0C80-\u0CFF]/.test(text)) return "kn-IN";
+  if (/[\u0900-\u097F]/.test(text)) return "hi-IN";
+  return "en-IN";
+}
 
-  if (panel.style.display === "block") {
-    panel.style.display = "none";
-    if (left) left.style.width = "100%";
-    return;
-  }
+/* ================= SPEAK ================= */
 
-  const res = await fetch("/tables");
-  const data = await res.json();
+function speak(text, lang) {
+  if (!window.speechSynthesis) return;
 
-  let html = "";
-  for (const [table, obj] of Object.entries(data)) {
-    html += `<h4>${table}</h4>`;
-    html += renderTable(obj.columns, obj.rows);
-  }
+  const utter = new SpeechSynthesisUtterance(cleanForSpeech(text));
+  utter.lang = lang || "en-IN";
 
-  info.innerHTML = html;
-  panel.style.display = "block";
-  if (left) left.style.width = "65%";
-};
+  utter.onstart = () => {
+    isSpeaking = true;
+    setSpeakListening(true);
+  };
 
-window.runQuery = async function () {
-  const qidEl = document.getElementById("qid");
-  const sqlEl = document.getElementById("sql");
-  const out = document.getElementById("output");
-  if (!qidEl || !sqlEl || !out) return;
+  utter.onend = () => {
+    isSpeaking = false;
+    setSpeakListening(false);
+  };
 
-  const sql = sqlEl.value.trim();
-  if (!sql) {
-    out.innerText = "Enter SQL query";
-    return;
-  }
-
-  const res = await fetch("/run", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ qid: qidEl.value, user_sql: sql })
-  });
-
-  const data = await res.json();
-  out.innerHTML = `
-    <b>${data.status === "correct" ? "✅ Correct" : "❌ Wrong"}</b>
-    <pre>${data.expected_sql}</pre>
-    ${renderTable(data.cols, data.rows)}
-  `;
-};
-
-window.showAnswer = async function () {
-  const qidEl = document.getElementById("qid");
-  const out = document.getElementById("output");
-  if (!qidEl || !out) return;
-
-  const res = await fetch("/show-answer", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ qid: qidEl.value })
-  });
-
-  const data = await res.json();
-  out.innerHTML = `
-    <h4>Correct Query</h4>
-    <pre>${data.expected_sql}</pre>
-    ${renderTable(data.cols, data.rows)}
-  `;
-};
+  speechSynthesis.speak(utter);
+}
 
 /* ================= AI / YOUTUBE ================= */
 
@@ -167,30 +110,28 @@ function tryPlayYouTube(text) {
   return true;
 }
 
+/* ================= ASK BUTTON ================= */
+
 window.askAIMentor = function () {
+  playPendingNewYearGreeting();
+
   const input = document.getElementById("aiInput");
   const out = document.getElementById("aiOutput");
   if (!input || !out) return;
 
   const text = input.value.trim();
-  if (!text) return;
 
-  // ✅ NEW: Greeting when Ask is clicked without input
   if (!text) {
     out.innerHTML = `
-      👋 <b>Hi! Welcome to SQL Practice.</b><br><br>
-      This app helps you practice <b>real interview-level SQL questions</b>, 
-      understand table data, and get instant feedback on your queries.<br><br>
-      💡 You can:
-      <ul>
-        <li>Write and run SQL queries</li>
-        <li>Ask doubts using text</li>
-        <li>Use <b>🎤 Speak</b> to talk and get voice responses</li>
-      </ul>
-      👉 Try clicking <b>🎤 Speak</b> and ask your question by voice!
+      👋 <b>Welcome to SQL Practice!</b><br><br>
+      You can ask questions in two ways:<br>
+      • ✍️ Type your question and click <b>Ask</b><br>
+      • 🎤 Use <b>Speak</b> to talk and get voice answers<br><br>
+      👉 Try clicking <b>🎤 Speak</b> and ask your doubt by voice.
     `;
     return;
   }
+
   if (tryPlayYouTube(text)) return;
 
   fetch("/ai/chat", {
@@ -204,38 +145,14 @@ window.askAIMentor = function () {
     });
 };
 
-/* ================= SPEECH ================= */
-
-function speak(text, lang) {
-  if (!window.speechSynthesis) return;
-
-  const utter = new SpeechSynthesisUtterance(cleanForSpeech(text));
-  utter.lang = lang || "en-IN";
-
-  utter.onstart = () => {
-    isSpeaking = true;
-    setSpeakListening(true);   // 🔴 red button
-  };
-
-  utter.onend = () => {
-    isSpeaking = false;
-    setSpeakListening(false);  // ⚪ normal
-  };
-
-  speechSynthesis.speak(utter);
-}
-
-
-/* ================= MIC (SPEAK BUTTON) ================= */
+/* ================= MIC / SPEAK BUTTON ================= */
 
 window.startVoiceInput = function () {
-  // toggle: if already listening or speaking → stop
+  playPendingNewYearGreeting();
+
+  // toggle stop
   if (isListening || isSpeaking) {
-    if (window.speechSynthesis) speechSynthesis.cancel();
-    if (recognition) recognition.stop();
-    isListening = false;
-    isSpeaking = false;
-    setSpeakListening(false);
+    stopAllVoice();
     return;
   }
 
@@ -244,33 +161,33 @@ window.startVoiceInput = function () {
 
   recognition = new SR();
   recognition.lang = "en-IN";
+  recognition.continuous = false;
 
   isListening = true;
   setSpeakListening(true);
 
- recognition.onresult = e => {
-  const text = e.results[0][0].transcript;
-  document.getElementById("aiInput").value = text;
+  recognition.onresult = e => {
+    const text = e.results[0][0].transcript;
+    document.getElementById("aiInput").value = text;
 
-  if (tryPlayYouTube(text)) return;
+    if (tryPlayYouTube(text)) return;
 
-  fetch("/ai/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: text })
-  })
-    .then(res => res.text())
-    .then(reply => {
-      const out = document.getElementById("aiOutput");
-      out.innerHTML = formatForDisplay(reply);
+    fetch("/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text })
+    })
+      .then(res => res.text())
+      .then(reply => {
+        const out = document.getElementById("aiOutput");
+        out.innerHTML = formatForDisplay(reply);
 
-      // ✅ FORCE VOICE OUTPUT (THIS WAS MISSING / BROKEN)
-      setTimeout(() => {
-        speak(reply, detectLanguage(reply));
-      }, 100);
-    });
-};
-
+        // 🔊 GUARANTEED VOICE RESPONSE
+        setTimeout(() => {
+          speak(reply, detectLanguage(reply));
+        }, 150);
+      });
+  };
 
   recognition.onend = () => {
     isListening = false;
@@ -280,20 +197,22 @@ window.startVoiceInput = function () {
   recognition.start();
 };
 
+/* ================= NEW YEAR ================= */
 
-/* ================= NEW YEAR BANNER + GREETING ================= */
+function playPendingNewYearGreeting() {
+  if (!newYearGreetingPending) return;
+
+  newYearGreetingPending = false;
+  sessionStorage.setItem("newYearGreeted", "true");
+
+  speak("Happy New Year! Welcome to SQL Practice.", "en-IN");
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   const today = new Date();
   const isNewYear = today.getDate() === 1 && today.getMonth() === 0;
 
-  const banner = document.getElementById("newYearBanner");
-  if (isNewYear && banner) {
-    banner.style.display = "block";
-  }
-
   if (isNewYear && !sessionStorage.getItem("newYearGreeted")) {
-    sessionStorage.setItem("newYearGreeted", "true");
-    speak("Happy New Year! Wishing you success and growth", "en-IN");
+    newYearGreetingPending = true;
   }
 });
