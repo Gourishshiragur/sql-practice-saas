@@ -7,7 +7,7 @@ import logging
 router = APIRouter(prefix="/ai")
 logging.basicConfig(level=logging.INFO)
 
-# 🔎 DEBUG (safe to remove later)
+# 🔎 DEBUG (KEEP FOR NOW – remove later if needed)
 print("🔥 GROQ_API_KEY from tools.py:", os.getenv("GROQ_API_KEY"))
 
 # ======================
@@ -24,34 +24,31 @@ def chat(req: ChatRequest):
     user_text = req.message.strip()
 
     if not user_text:
-        return "ದಯವಿಟ್ಟು ಏನಾದರೂ ಹೇಳಿ 🙂"
+        return "Please say or type something 🙂"
 
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         return "AI is not configured yet."
 
-    # ✅ WEBSITE-AWARE SYSTEM PROMPT
+    # ✅ ENGLISH-ONLY SYSTEM PROMPT (FINAL)
     system_prompt = """
 You are an AI mentor embedded inside a SQL Practice web application.
 
 ABOUT THIS WEBSITE:
-- This website is designed to practice SQL questions.
-- Users see one SQL question at a time.
-- Users write SQL queries and click the "Run" button to validate their answer.
-- If the user clicks "I don't know", the correct SQL query and result are shown.
-- "Show Tables" displays available database tables with sample data.
-- User progress and accuracy are tracked automatically.
-- There is a built-in AI assistant (you) for help, hints, and guidance.
+- This website helps users practice SQL interview questions.
+- Users answer one SQL question at a time.
+- They can run SQL queries to check correctness.
+- If they click "I don't know", the correct SQL and result table are shown.
+- "Show Tables" displays available tables with sample data.
+- There is a built-in AI assistant (you) for help and guidance.
 
-HOW TO ANSWER:
-- If the user asks "How to use this website", explain the above clearly.
-- If the user asks SQL questions, explain SQL concepts simply.
-- If the user asks general questions, answer naturally.
-- If the user speaks in Kannada → reply in Kannada.
-- If the user speaks in Hindi → reply in Hindi.
-- Otherwise reply in English.
-- Be short, friendly, and practical.
-- Do NOT say you are just an AI model.
+HOW TO RESPOND:
+- Always reply in clear, simple ENGLISH only.
+- Use a friendly Indian English tone.
+- Explain SQL concepts step by step when needed.
+- If asked how to use the website, explain it clearly.
+- Keep answers short, practical, and helpful.
+- Do NOT mention that you are an AI model.
 """
 
     try:
@@ -70,8 +67,8 @@ HOW TO ANSWER:
         )
 
         reply = completion.choices[0].message.content.strip()
-        return reply or "ಸರಿ 🙂 ನಾನು ಸಹಾಯ ಮಾಡಬಹುದು."
+        return reply or "Sure 🙂 I can help you."
 
     except Exception as e:
         logging.error(f"❌ Groq error: {e}")
-        return "ಕ್ಷಮಿಸಿ 😕 ಈಗ ಉತ್ತರಿಸಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ."
+        return "Sorry 😕 I am unable to respond right now."
