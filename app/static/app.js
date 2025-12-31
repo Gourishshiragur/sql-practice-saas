@@ -70,6 +70,82 @@ function detectLanguage(text) {
   if (/[\u0900-\u097F]/.test(text)) return "hi-IN";
   return "en-IN";
 }
+/* ================= SQL ================= */
+
+window.toggleTables = async function () {
+  const panel = document.getElementById("tablePanel");
+  const info = document.getElementById("tableInfo");
+  const left = document.querySelector(".left");
+  if (!panel || !info) return;
+
+  if (panel.style.display === "block") {
+    panel.style.display = "none";
+    if (left) left.style.width = "100%";
+    return;
+  }
+
+  const res = await fetch("/tables");
+  const data = await res.json();
+
+  let html = "";
+  for (const [table, obj] of Object.entries(data)) {
+    html += `<h4>${table}</h4>`;
+    html += renderTable(obj.columns, obj.rows);
+  }
+
+  info.innerHTML = html;
+  panel.style.display = "block";
+  if (left) left.style.width = "65%";
+};
+
+window.runQuery = async function () {
+  const qidEl = document.getElementById("qid");
+  const sqlEl = document.getElementById("sql");
+  const out = document.getElementById("output");
+  if (!qidEl || !sqlEl || !out) return;
+
+  const sql = sqlEl.value.trim();
+  if (!sql) {
+    out.innerText = "Enter SQL query";
+    return;
+  }
+
+  const res = await fetch("/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      qid: qidEl.value,
+      user_sql: sql
+    })
+  });
+
+  const data = await res.json();
+  out.innerHTML = `
+    <b>${data.status === "correct" ? "✅ Correct" : "❌ Wrong"}</b>
+    <pre>${data.expected_sql}</pre>
+    ${renderTable(data.cols, data.rows)}
+  `;
+};
+
+window.showAnswer = async function () {
+  const qidEl = document.getElementById("qid");
+  const out = document.getElementById("output");
+  if (!qidEl || !out) return;git
+
+  const res = await fetch("/show-answer", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ qid: qidEl.value })
+  });
+
+  const data = await res.json();
+  out.innerHTML = `
+    <h4>Correct Query</h4>
+    <pre>${data.expected_sql}</pre>
+    ${renderTable(data.cols, data.rows)}
+  `;
+};
+
 
 /* ================= SPEAK ================= */
 
