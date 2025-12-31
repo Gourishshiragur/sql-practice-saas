@@ -197,6 +197,8 @@ tr:hover {
 
   <!-- JS -->
   <script src="/static/app.js?v=1.0.1" defer></script>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#1f4f5f">
 
 </head>
 
@@ -314,6 +316,17 @@ tr:hover {
   </div>
 
 </div> <!-- END MAIN -->
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/static/sw.js")
+      .then(() => console.log("✅ Service Worker registered"))
+      .catch(err => console.error("❌ SW failed", err));
+  });
+}
+</script>
+
 
 </body>
 </html>

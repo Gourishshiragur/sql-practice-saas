@@ -23,11 +23,12 @@ function renderTable(cols, rows) {
 }
 
 function formatForDisplay(text) {
-  if (!text) return "";
   return text
+    .replace(/\\"/g, '"')
     .replace(/\\n/g, "\n")
     .replace(/\n/g, "<br>");
 }
+
 
 /* ================= SQL ================= */
 
@@ -186,16 +187,22 @@ function detectLanguage(text) {
   if (/[\u0900-\u097F]/.test(text)) return "hi-IN";
   return "en-US";
 }
+function cleanForSpeech(text) {
+  if (!text) return "";
+
+  return text
+    .replace(/\\"/g, '"')     // remove escaped quotes
+    .replace(/\\'/g, "'")     // remove escaped apostrophes
+    .replace(/\\n/g, " ")     // remove literal \n
+    .replace(/\n/g, " ")      // remove real newlines
+    .replace(/\s+/g, " ")     // normalize spaces
+    .trim();
+}
 
 function speak(text, lang) {
   if (!window.speechSynthesis) return;
 
-  // Clean text (important)
-  const cleanText = text
-    .replace(/\\n/g, " ")
-    .replace(/\n/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const cleanText = cleanForSpeech(text);
 
   const utter = new SpeechSynthesisUtterance(cleanText);
   const voices = speechSynthesis.getVoices();
