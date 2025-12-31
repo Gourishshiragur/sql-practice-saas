@@ -227,3 +227,34 @@ window.startVoiceInput = function () {
 
   recog.start();
 };
+document.addEventListener("DOMContentLoaded", () => {
+  const today = new Date();
+
+  const isNewYear =
+    today.getDate() === 1 &&
+    today.getMonth() === 0; // January = 0
+
+  if (isNewYear) {
+    if (localStorage.getItem("newYearShown")) return;
+localStorage.setItem("newYearShown", "true");
+
+    const banner = document.getElementById("newYearBanner");
+    if (banner) {
+      banner.style.display = "block";
+
+      // Auto hide after 6 seconds (optional)
+      setTimeout(() => {
+        banner.style.display = "none";
+      }, 6000);
+    }
+
+    // Optional voice greeting (if speech enabled)
+    if (window.speechSynthesis) {
+      const msg = new SpeechSynthesisUtterance(
+        "Happy New Year! Wishing you success and growth"
+      );
+      msg.lang = "en-IN";
+      speechSynthesis.speak(msg);
+    }
+  }
+});
