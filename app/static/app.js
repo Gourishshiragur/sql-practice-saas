@@ -232,27 +232,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const isNewYear =
     today.getDate() === 1 &&
-    today.getMonth() === 0; // Jan = 0
+    today.getMonth() === 0; // January = 0
 
-  // sessionStorage → resets when tab/browser is closed
-  const alreadyShown = sessionStorage.getItem("newYearShown");
+  if (isNewYear) {
+    if (localStorage.getItem("newYearShown")) return;
+    localStorage.setItem("newYearShown", "true");
 
-  if (isNewYear && !alreadyShown) {
     const banner = document.getElementById("newYearBanner");
-
     if (banner) {
       banner.style.display = "block";
 
-      // mark as shown for this session
-      sessionStorage.setItem("newYearShown", "true");
-
-      // auto hide after 6 seconds
+      // Auto hide after 6 seconds (optional)
       setTimeout(() => {
         banner.style.display = "none";
       }, 6000);
     }
 
-    // Optional voice greeting
+    // Optional voice greeting (if speech enabled)
     if (window.speechSynthesis) {
       const msg = new SpeechSynthesisUtterance(
         "Happy New Year! Wishing you success and growth"
@@ -262,3 +258,4 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 });
+
