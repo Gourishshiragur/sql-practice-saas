@@ -5,6 +5,16 @@ let isListening = false;
 let recognition = null;
 
 /* ================= VOICE INIT ================= */
+function setSpeakListening(active) {
+  const btn = document.getElementById("speakBtn");
+  if (!btn) return;
+
+  if (active) {
+    btn.classList.add("listening");
+  } else {
+    btn.classList.remove("listening");
+  }
+}
 
 if (window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => {
@@ -184,6 +194,15 @@ function speak(text, lang) {
 
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = lang || "en-IN";
+utter.onstart = () => {
+  isSpeaking = true;
+  setSpeakListening(true);
+};
+
+utter.onend = () => {
+  isSpeaking = false;
+  setSpeakListening(false);
+};
 
   utter.onstart = () => {
     isSpeaking = true;
@@ -200,10 +219,14 @@ function speak(text, lang) {
 
 /* ================= MIC (SPEAK BUTTON) ================= */
 
-window.startVoiceInput = function () {
-  // TOGGLE behavior
+wwindow.startVoiceInput = function () {
+  // toggle: if already listening or speaking → stop
   if (isListening || isSpeaking) {
-    stopAllVoice();
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    if (recognition) recognition.stop();
+    isListening = false;
+    isSpeaking = false;
+    setSpeakListening(false);
     return;
   }
 
@@ -212,10 +235,9 @@ window.startVoiceInput = function () {
 
   recognition = new SR();
   recognition.lang = "en-IN";
-  recognition.continuous = false;
 
   isListening = true;
-  setSpeakButtonState(true);
+  setSpeakListening(true);
 
   recognition.onresult = e => {
     const text = e.results[0][0].transcript;
@@ -232,17 +254,18 @@ window.startVoiceInput = function () {
       .then(reply => {
         const out = document.getElementById("aiOutput");
         out.innerHTML = formatForDisplay(reply);
-        speak(reply, "en-IN");
+        speak(reply, detectLanguage(text));
       });
   };
 
   recognition.onend = () => {
     isListening = false;
-    if (!isSpeaking) setSpeakButtonState(false);
+    if (!isSpeaking) setSpeakListening(false);
   };
 
   recognition.start();
 };
+
 
 /* ================= NEW YEAR BANNER + GREETING ================= */
 
