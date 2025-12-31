@@ -1,4 +1,6 @@
 console.log("✅ app.js loaded");
+let isSpeaking = false;
+
 // Ensure voices are loaded (important for Chrome/Edge)
 if (window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => {
@@ -202,65 +204,42 @@ function cleanForSpeech(text) {
 function speak(text, lang) {
   if (!window.speechSynthesis) return;
 
+  // 🛑 Stop any previous speech
+  speechSynthesis.cancel();
+
   const cleanText = cleanForSpeech(text);
+  if (!cleanText) return;
 
   const utter = new SpeechSynthesisUtterance(cleanText);
   const voices = speechSynthesis.getVoices();
 
-  let selectedVoice = null;
+  let voice =
+    voices.find(v => v.lang === lang) ||
+    voices.find(v => v.lang.startsWith(lang.split("-")[0])) ||
+    voices.find(v => v.lang.startsWith("en"));
 
-  // 1️⃣ Try FEMALE Indian Kannada
-  if (lang === "kn-IN") {
-    selectedVoice = voices.find(v =>
-      v.lang === "kn-IN" &&
-      /female|woman|zira|heera|kavya|siri/i.test(v.name)
-    );
-  }
+  if (!voice) return;
 
-  // 2️⃣ Try FEMALE Indian Hindi
-  if (!selectedVoice && lang === "hi-IN") {
-    selectedVoice = voices.find(v =>
-      v.lang === "hi-IN" &&
-      /female|woman|swara|zira|heera/i.test(v.name)
-    );
-  }
-
-  // 3️⃣ Try ANY Indian female
-  if (!selectedVoice) {
-    selectedVoice = voices.find(v =>
-      v.lang.startsWith("en-IN") &&
-      /female|woman/i.test(v.name)
-    );
-  }
-
-  // 4️⃣ Fallback: any Indian voice
-  if (!selectedVoice) {
-    selectedVoice = voices.find(v =>
-      v.lang.startsWith(lang.split("-")[0])
-    );
-  }
-
-  // 5️⃣ Final fallback: English female
-  if (!selectedVoice) {
-    selectedVoice = voices.find(v =>
-      v.lang.startsWith("en") &&
-      /female|woman/i.test(v.name)
-    );
-  }
-
-  if (!selectedVoice) {
-    console.warn("No suitable voice found, skipping speech");
-    return;
-  }
-
-  utter.voice = selectedVoice;
-  utter.lang = selectedVoice.lang;
+  utter.voice = voice;
+  utter.lang = voice.lang;
   utter.rate = 1;
   utter.pitch = 1;
 
-  speechSynthesis.cancel();
+  const stopBtn = document.getElementById("stopBtn");
+
+  utter.onstart = () => {
+    isSpeaking = true;
+    if (stopBtn) stopBtn.style.display = "inline-block";
+  };
+
+  utter.onend = utter.onerror = () => {
+    isSpeaking = false;
+    if (stopBtn) stopBtn.style.display = "none";
+  };
+
   speechSynthesis.speak(utter);
 }
+
 
 
 window.startVoiceInput = function () {
@@ -306,4 +285,13 @@ window.startVoiceInput = function () {
   };
 
   recog.start();
+};
+window.stopSpeaking = function () {
+  if (window.speechSynthesis && isSpeaking) {
+    speechSynthesis.cancel();
+  }
+
+  isSpeaking = false;
+  const stopBtn = document.getElementById("stopBtn");
+  if (stopBtn) stopBtn.style.display = "none";
 };
