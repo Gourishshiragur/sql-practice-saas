@@ -1,11 +1,42 @@
 console.log("✅ app.js loaded");
-let isSpeaking = false;
 
-// Ensure voices are loaded
+let isSpeaking = false;
+let isListening = false;
+let recognition = null;
+
+/* ================= VOICE INIT ================= */
+
 if (window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => {
     speechSynthesis.getVoices();
   };
+}
+
+/* ================= SPEAK BUTTON UI ================= */
+
+function setSpeakButtonState(active) {
+  const btn = document.getElementById("speakBtn");
+  if (!btn) return;
+
+  if (active) {
+    btn.style.backgroundColor = "red";
+    btn.style.color = "white";
+  } else {
+    btn.style.backgroundColor = "";
+    btn.style.color = "";
+  }
+}
+
+function stopAllVoice() {
+  if (window.speechSynthesis) {
+    speechSynthesis.cancel();
+  }
+  if (recognition && isListening) {
+    recognition.stop();
+  }
+  isSpeaking = false;
+  isListening = false;
+  setSpeakButtonState(false);
 }
 
 /* ================= UTIL ================= */
@@ -104,26 +135,19 @@ window.showAnswer = async function () {
   `;
 };
 
-/* ================= YOUTUBE AUTO PLAY ================= */
+/* ================= AI / YOUTUBE ================= */
 
 function tryPlayYouTube(text) {
-  const lower = text.toLowerCase();
+  if (!text.toLowerCase().startsWith("play")) return false;
 
-  if (!lower.startsWith("play")) return false;
-
-  let query = text
-    .replace(/play/gi, "")
-    .replace(/song/gi, "")
-    .replace(/music/gi, "")
-    .trim();
-
+  let query = text.replace(/play|song|music/gi, "").trim();
   if (!query) query = "music";
 
-  const url =
+  window.open(
     "https://www.youtube.com/results?search_query=" +
-    encodeURIComponent(query);
-
-  window.open(url, "_blank");
+      encodeURIComponent(query),
+    "_blank"
+  );
 
   const out = document.getElementById("aiOutput");
   if (out) out.innerText = "🎵 Opening YouTube…";
@@ -131,8 +155,6 @@ function tryPlayYouTube(text) {
   speak("Opening YouTube", "en-US");
   return true;
 }
-
-/* ================= AI (TEXT) ================= */
 
 window.askAIMentor = function () {
   const input = document.getElementById("aiInput");
@@ -142,7 +164,6 @@ window.askAIMentor = function () {
   const text = input.value.trim();
   if (!text) return;
 
-  // 🎵 YouTube first
   if (tryPlayYouTube(text)) return;
 
   fetch("/ai/chat", {
@@ -156,60 +177,50 @@ window.askAIMentor = function () {
     });
 };
 
-/* ================= VOICE ================= */
-
-let lastSpokenLang = "en-US";
-
-function detectLanguage(text) {
-  if (/[\u0C80-\u0CFF]/.test(text)) return "kn-IN";
-  if (/[\u0900-\u097F]/.test(text)) return "hi-IN";
-  return "en-US";
-}
-
-function cleanForSpeech(text) {
-  return text
-    .replace(/\\"/g, '"')
-    .replace(/\\n/g, " ")
-    .replace(/\n/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+/* ================= SPEECH ================= */
 
 function speak(text, lang) {
-  if (!window.speechSynthesis) return;
-  speechSynthesis.cancel();
+  stopAllVoice();
 
-  const utter = new SpeechSynthesisUtterance(cleanForSpeech(text));
-  const voices = speechSynthesis.getVoices();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = lang || "en-IN";
 
-  utter.voice =
-    voices.find(v => v.lang === lang) ||
-    voices.find(v => v.lang.startsWith(lang.split("-")[0])) ||
-    voices.find(v => v.lang.startsWith("en"));
+  utter.onstart = () => {
+    isSpeaking = true;
+    setSpeakButtonState(true);
+  };
 
-  if (!utter.voice) return;
-
-  utter.onstart = () => isSpeaking = true;
-  utter.onend = () => isSpeaking = false;
+  utter.onend = () => {
+    isSpeaking = false;
+    setSpeakButtonState(false);
+  };
 
   speechSynthesis.speak(utter);
 }
 
+/* ================= MIC (SPEAK BUTTON) ================= */
+
 window.startVoiceInput = function () {
-  speechSynthesis.cancel();
+  // TOGGLE behavior
+  if (isListening || isSpeaking) {
+    stopAllVoice();
+    return;
+  }
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return;
 
-  const recog = new SR();
-  recog.lang = "en-IN";
+  recognition = new SR();
+  recognition.lang = "en-IN";
+  recognition.continuous = false;
 
-  recog.onresult = e => {
+  isListening = true;
+  setSpeakButtonState(true);
+
+  recognition.onresult = e => {
     const text = e.results[0][0].transcript;
     document.getElementById("aiInput").value = text;
-    lastSpokenLang = detectLanguage(text);
 
-    // 🎵 YouTube first
     if (tryPlayYouTube(text)) return;
 
     fetch("/ai/chat", {
@@ -221,41 +232,31 @@ window.startVoiceInput = function () {
       .then(reply => {
         const out = document.getElementById("aiOutput");
         out.innerHTML = formatForDisplay(reply);
-        speak(reply, lastSpokenLang);
+        speak(reply, "en-IN");
       });
   };
 
-  recog.start();
+  recognition.onend = () => {
+    isListening = false;
+    if (!isSpeaking) setSpeakButtonState(false);
+  };
+
+  recognition.start();
 };
+
+/* ================= NEW YEAR BANNER + GREETING ================= */
+
 document.addEventListener("DOMContentLoaded", () => {
   const today = new Date();
+  const isNewYear = today.getDate() === 1 && today.getMonth() === 0;
 
-  const isNewYear =
-    today.getDate() === 1 &&
-    today.getMonth() === 0; // January = 0
+  const banner = document.getElementById("newYearBanner");
+  if (isNewYear && banner) {
+    banner.style.display = "block";
+  }
 
-  if (isNewYear) {
-    if (localStorage.getItem("newYearShown")) return;
-    localStorage.setItem("newYearShown", "true");
-
-    const banner = document.getElementById("newYearBanner");
-    if (banner) {
-      banner.style.display = "block";
-
-      // Auto hide after 6 seconds (optional)
-      setTimeout(() => {
-        banner.style.display = "none";
-      }, 6000);
-    }
-
-    // Optional voice greeting (if speech enabled)
-    if (window.speechSynthesis) {
-      const msg = new SpeechSynthesisUtterance(
-        "Happy New Year! Wishing you success and growth"
-      );
-      msg.lang = "en-IN";
-      speechSynthesis.speak(msg);
-    }
+  if (isNewYear && !sessionStorage.getItem("newYearGreeted")) {
+    sessionStorage.setItem("newYearGreeted", "true");
+    speak("Happy New Year! Wishing you success and growth", "en-IN");
   }
 });
-
