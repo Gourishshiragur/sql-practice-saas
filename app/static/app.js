@@ -168,6 +168,34 @@ window.showAnswer = async function () {
 };
 
 /* ================= ASK ================= */
+function tryPlayYouTube(text) {
+  if (!text) return false;
+
+  const lower = text.toLowerCase();
+  if (!lower.startsWith("play")) return false;
+
+  let query = lower
+    .replace("play", "")
+    .replace("song", "")
+    .replace("music", "")
+    .trim();
+
+  if (!query) query = "music";
+
+  const url =
+    "https://www.youtube.com/results?search_query=" +
+    encodeURIComponent(query);
+
+  window.open(url, "_blank");
+
+  const out = document.getElementById("aiOutput");
+  if (out) out.innerHTML = "🎵 Opening YouTube for <b>" + query + "</b>";
+
+  // Optional voice feedback
+  speak("Opening YouTube");
+
+  return true;
+}
 
 window.askAIMentor = function () {
   playPendingNewYearGreeting();
@@ -184,6 +212,7 @@ window.askAIMentor = function () {
     `;
     return;
   }
+   if (tryPlayYouTube(text)) return;
 
   fetch("/ai/chat", {
     method: "POST",
@@ -216,8 +245,11 @@ window.startVoiceInput = function () {
 
   recognition.onresult = function (e) {
     const text = e.results[0][0].transcript;
-    document.getElementById("aiInput").value = text;
+  document.getElementById("aiInput").value = text;
 
+if (tryPlayYouTube(text)) return;
+
+       
     fetch("/ai/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
