@@ -1,4 +1,25 @@
 console.log("✅ app.js loaded");
+/* ================= PWA INSTALL ================= */
+
+let deferredPrompt = null;
+
+window.addEventListener("beforeinstallprompt", function (e) {
+  e.preventDefault(); // stop browser mini-infobar
+  deferredPrompt = e;
+
+  console.log("📲 PWA install available");
+
+  // Optional: auto-show install hint in output area
+  const out = document.getElementById("aiOutput");
+ if (out) {
+  out.innerHTML = `
+    📲 <b>Install SQL Practice App</b><br><br>
+    <button onclick="installApp()" style="padding:8px 12px;font-size:14px">
+      Install App
+    </button>
+  `;
+}
+
 
 /* ================= GLOBAL STATE ================= */
 
@@ -286,6 +307,17 @@ if (tryPlayYouTube(text)) return;
   };
 
   recognition.start();
+};
+window.installApp = async function () {
+  if (!deferredPrompt) {
+    alert("Install option not available yet. Use browser menu.");
+    return;
+  }
+
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+
+  deferredPrompt = null;
 };
 
 /* ================= NEW YEAR ================= */
