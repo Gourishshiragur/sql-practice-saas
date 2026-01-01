@@ -2,47 +2,35 @@ console.log("✅ app.js loaded");
 
 /* ================= PWA INSTALL ================= */
 
+/* ================= PWA INSTALL (IN-PAGE BUTTON) ================= */
+
 let deferredPrompt = null;
 
-// Listen for install availability
-window.addEventListener("beforeinstallprompt", function (e) {
+window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
 
   console.log("📲 PWA install available");
 
-  const out = document.getElementById("aiOutput");
-  if (out) {
-    out.innerHTML = `
-      📲 <b>Install SQL Practice App</b><br><br>
-      <button onclick="installApp()" style="padding:8px 12px;font-size:14px">
-        Install App
-      </button>
-    `;
-  }
+  const btn = document.getElementById("installBtn");
+  if (btn) btn.style.display = "inline-block";
 });
 
-// Register Service Worker (SINGLE place, correct scope)
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/static/sw.js", { scope: "/static/" })
-      .then(() => console.log("✅ Service Worker registered with /static scope"))
-      .catch(err => console.error("❌ SW failed", err));
-  });
-}
-
-// Install button handler
 window.installApp = async function () {
   if (!deferredPrompt) {
-    alert("Install option not available yet. Use browser menu.");
+    alert("Install option not available. Use browser menu.");
     return;
   }
 
   deferredPrompt.prompt();
   await deferredPrompt.userChoice;
+
   deferredPrompt = null;
+
+  const btn = document.getElementById("installBtn");
+  if (btn) btn.style.display = "none";
 };
+
 
 
 /* ================= GLOBAL STATE ================= */
