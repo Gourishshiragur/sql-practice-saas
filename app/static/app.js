@@ -1,35 +1,42 @@
 console.log("✅ app.js loaded");
 
-/* ================= PWA INSTALL ================= */
+
 
 /* ================= PWA INSTALL (IN-PAGE BUTTON) ================= */
 
 let deferredPrompt = null;
 
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
-
-  console.log("📲 PWA install available");
 
   const btn = document.getElementById("installBtn");
   if (btn) btn.style.display = "inline-block";
 });
 
-window.installApp = async function () {
-  if (!deferredPrompt) {
-    alert("Install option not available. Use browser menu.");
-    return;
+// iOS fallback (always show hint)
+window.addEventListener("load", () => {
+  if (isIOS()) {
+    const hint = document.getElementById("installHint");
+    if (hint) hint.style.display = "block";
   }
+});
+
+window.installApp = async function () {
+  if (!deferredPrompt) return;
 
   deferredPrompt.prompt();
   await deferredPrompt.userChoice;
-
   deferredPrompt = null;
 
   const btn = document.getElementById("installBtn");
   if (btn) btn.style.display = "none";
 };
+
 
 
 

@@ -292,13 +292,19 @@ tr:hover {
 
   <!-- AI response -->
   <p id="aiOutput" style="margin-top:10px;"></p>
-  <button
+ <div id="installHint" style="display:none; margin-top:10px;">
+  📲 <b>Install this app:</b><br>
+  Tap <b>Browser Menu (⋮ / Share)</b> → <b>Add to Home Screen</b>
+</div>
+
+<button
   id="installBtn"
   onclick="installApp()"
   style="display:none; margin-top:10px;"
 >
 📲 Install App
 </button>
+
 
 
   <!-- Camera preview (hidden by default) -->
