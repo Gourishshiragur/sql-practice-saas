@@ -47,24 +47,29 @@ def home(request: Request, level: str = "easy", q_index: int = 0):
 # =========================
 @app.get("/tables")
 def tables():
-    return {
-        "employees": {
-            "columns": ["id", "name", "department_id", "salary", "hire_date"],
-            "rows": [
-                [1, "Alice", 1, 60000, "2021-03-01"],
-                [2, "Bob", 2, 45000, "2020-07-15"],
-                [3, "Charlie", 1, 70000, "2019-11-20"],
-            ],
-        },
-        "departments": {
-            "columns": ["id", "department_name", "location"],
-            "rows": [
-                [1, "IT", "Bangalore"],
-                [2, "HR", "Mumbai"],
-                [3, "Finance", "Delhi"],
-            ],
+    conn = get_connection()
+    cur = conn.cursor()
+
+    result = {}
+
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    tables = [t[0] for t in cur.fetchall()]
+
+    for table in tables:
+        cur.execute(f"PRAGMA table_info({table})")
+        cols = [c[1] for c in cur.fetchall()]
+
+        cur.execute(f"SELECT * FROM {table}")
+        rows = cur.fetchall()
+
+        result[table] = {
+            "columns": cols,
+            "rows": rows
         }
-    }
+
+    conn.close()
+    return result
+
 
 @app.post("/run")
 def run_query(user_sql: str = Form(...), qid: str = Form(...)):
