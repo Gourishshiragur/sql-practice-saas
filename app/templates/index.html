@@ -318,14 +318,7 @@ tr:hover {
 
 </div> <!-- END MAIN -->
 <script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/static/sw.js")
-      .then(() => console.log("✅ Service Worker registered"))
-      .catch(err => console.error("❌ SW failed", err));
-  });
-}
+
 </script>
 <div id="newYearBanner" style="
  display:block !important;

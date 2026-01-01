@@ -1,7 +1,7 @@
 const CACHE_NAME = "sql-ai-v1";
 
 const FILES_TO_CACHE = [
-  "/",
+  "/static/",
   "/static/app.js",
   "/static/manifest.json"
 ];
