@@ -70,8 +70,26 @@ function formatForDisplay(text) {
 }
 
 function cleanForSpeech(text) {
-  return text.replace(/\s+/g, " ").trim();
+  if (!text) return "";
+
+  return text
+    // remove markdown symbols
+    .replace(/\*\*/g, "")
+    .replace(/\*/g, "")
+    .replace(/`/g, "")
+
+    // handle escaped new lines
+    .replace(/\\n/g, ". ")
+    .replace(/\n/g, ". ")
+
+    // remove backslashes
+    .replace(/\\/g, "")
+
+    // normalize spaces
+    .replace(/\s+/g, " ")
+    .trim();
 }
+
 
 /* ================= SPEAK (INDIAN ENGLISH ONLY) ================= */
 
