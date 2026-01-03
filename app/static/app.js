@@ -1,8 +1,6 @@
 console.log("✅ app.js loaded");
 
-
-
-/* ================= PWA INSTALL (IN-PAGE BUTTON) ================= */
+/* ================= PWA INSTALL ================= */
 
 let deferredPrompt = null;
 
@@ -13,12 +11,10 @@ function isIOS() {
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
-
   const btn = document.getElementById("installBtn");
   if (btn) btn.style.display = "inline-block";
 });
 
-// iOS fallback (always show hint)
 window.addEventListener("load", () => {
   if (isIOS()) {
     const hint = document.getElementById("installHint");
@@ -27,18 +23,14 @@ window.addEventListener("load", () => {
 });
 
 window.installApp = async function () {
-  if (!deferredPrompt) return;
-
+  if (!deferredPrompt) {
+    alert("Install option not available yet. Use browser menu.");
+    return;
+  }
   deferredPrompt.prompt();
   await deferredPrompt.userChoice;
   deferredPrompt = null;
-
-  const btn = document.getElementById("installBtn");
-  if (btn) btn.style.display = "none";
 };
-
-
-
 
 /* ================= GLOBAL STATE ================= */
 
@@ -56,42 +48,15 @@ function isMobileDevice() {
 /* ================= VOICE INIT ================= */
 
 if (window.speechSynthesis) {
-  window.speechSynthesis.onvoiceschanged = function () {
+  window.speechSynthesis.onvoiceschanged = () => {
     speechSynthesis.getVoices();
   };
-}
-
-/* ================= SPEAK BUTTON UI ================= */
-
-function setSpeakListening(active) {
-  const btn = document.getElementById("speakBtn");
-  if (!btn) return;
-  if (active) btn.classList.add("listening");
-  else btn.classList.remove("listening");
-}
-
-/* ================= STOP ALL ================= */
-
-function stopAllVoice() {
-  if (recognition) {
-    try {
-      recognition.stop();
-    } catch (e) {
-      console.warn("recognition stop failed");
-    }
-  }
-  if (window.speechSynthesis) {
-    speechSynthesis.cancel();
-  }
-  isListening = false;
-  isSpeaking = false;
-  setSpeakListening(false);
 }
 
 /* ================= UTIL ================= */
 
 function renderTable(cols, rows) {
-  let html = "<table><tr>";
+  let html = "<table border='1'><tr>";
   cols.forEach(c => html += `<th>${c}</th>`);
   html += "</tr>";
   rows.forEach(r => {
@@ -103,62 +68,32 @@ function renderTable(cols, rows) {
 }
 
 function formatForDisplay(text) {
-  return text
-    .replace(/\\"/g, '"')
-    .replace(/\\n/g, "\n")
-    .replace(/\n/g, "<br>");
+  return text.replace(/\n/g, "<br>");
 }
 
 function cleanForSpeech(text) {
-  if (!text) return "";
-
   return text
-    // remove markdown symbols
-    .replace(/\*\*/g, "")
-    .replace(/\*/g, "")
-    .replace(/`/g, "")
-
-    // handle escaped new lines
-    .replace(/\\n/g, ". ")
+    .replace(/[*`]/g, "")
     .replace(/\n/g, ". ")
-
-    // remove backslashes
-    .replace(/\\/g, "")
-
-    // normalize spaces
     .replace(/\s+/g, " ")
     .trim();
 }
 
-
-/* ================= SPEAK (INDIAN ENGLISH ONLY) ================= */
+/* ================= SPEAK ================= */
 
 function speak(text) {
   if (!window.speechSynthesis) return;
-
   const utter = new SpeechSynthesisUtterance(cleanForSpeech(text));
   utter.lang = "en-IN";
-
-  utter.onstart = function () {
-    isSpeaking = true;
-    setSpeakListening(true);
-  };
-
-  utter.onend = function () {
-    isSpeaking = false;
-    setSpeakListening(false);
-  };
-
   speechSynthesis.speak(utter);
 }
 
-/* ================= SQL ================= */
+/* ================= SHOW TABLES (FIXED) ================= */
 
 window.toggleTables = async function () {
   const panel = document.getElementById("tablePanel");
-  const info = document.getElementById("tableInfo");
   const left = document.querySelector(".left");
-  if (!panel || !info) return;
+  if (!panel) return;
 
   if (panel.style.display === "block") {
     panel.style.display = "none";
@@ -166,19 +101,26 @@ window.toggleTables = async function () {
     return;
   }
 
-  const res = await fetch("/tables");
-  const data = await res.json();
+  try {
+    const res = await fetch("/tables");
+    const data = await res.json();
 
-  let html = "";
-  for (const [table, obj] of Object.entries(data)) {
-    html += `<h4>${table}</h4>`;
-    html += renderTable(obj.columns, obj.rows);
+    let html = "";
+    for (const [table, obj] of Object.entries(data)) {
+      html += `<h4>${table}</h4>`;
+      html += renderTable(obj.columns, obj.rows);
+    }
+
+    panel.innerHTML = html;   // ✅ FIX: render into panel itself
+    panel.style.display = "block";
+    if (left) left.style.width = "65%";
+  } catch (e) {
+    panel.innerHTML = "❌ Failed to load tables";
+    panel.style.display = "block";
   }
-
-  info.innerHTML = html;
-  panel.style.display = "block";
-  if (left) left.style.width = "65%";
 };
+
+/* ================= RUN SQL (UNCHANGED) ================= */
 
 window.runQuery = async function () {
   const qid = document.getElementById("qid");
@@ -206,166 +148,25 @@ window.runQuery = async function () {
   `;
 };
 
-window.showAnswer = async function () {
-  const qid = document.getElementById("qid");
-  const out = document.getElementById("output");
-  if (!qid || !out) return;
+/* ================= NEW YEAR BANNER (FIXED) ================= */
 
-  const res = await fetch("/show-answer", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ qid: qid.value })
-  });
+document.addEventListener("DOMContentLoaded", () => {
+  const banner = document.getElementById("newYearBanner");
+  if (!banner) return;
 
-  const data = await res.json();
-  out.innerHTML = `
-    <h4>Correct Query</h4>
-    <pre>${data.expected_sql}</pre>
-    ${renderTable(data.cols, data.rows)}
-  `;
-};
+  const now = new Date();
+  const start = new Date("2026-01-01T00:00:00");
+  const end = new Date("2026-01-01T23:59:59");
 
-/* ================= ASK ================= */
-function tryPlayYouTube(text) {
-  if (!text) return false;
+  banner.style.display =
+    now >= start && now <= end ? "block" : "none";
 
-  const lower = text.toLowerCase();
-  if (!lower.startsWith("play")) return false;
-
-  let query = lower
-    .replace("play", "")
-    .replace("song", "")
-    .replace("music", "")
-    .trim();
-
-  if (!query) query = "music";
-
-  const url =
-    "https://www.youtube.com/results?search_query=" +
-    encodeURIComponent(query);
-
-  window.open(url, "_blank");
-
-  const out = document.getElementById("aiOutput");
-  if (out) out.innerHTML = "🎵 Opening YouTube for <b>" + query + "</b>";
-
-  // Optional voice feedback
-  speak("Opening YouTube");
-
-  return true;
-}
-
-window.askAIMentor = function () {
-  playPendingNewYearGreeting();
-
-  const input = document.getElementById("aiInput");
-  const out = document.getElementById("aiOutput");
-  if (!input || !out) return;
-
-  const text = input.value.trim();
-  if (!text) {
-    out.innerHTML = `
-      👋 <b>Welcome to SQL Practice!</b><br><br>
-      Type your question or use 🎤 Speak to ask by voice.
-    `;
-    return;
-  }
-   if (tryPlayYouTube(text)) return;
-
-  fetch("/ai/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: text })
-  })
-    .then(r => r.text())
-    .then(reply => out.innerHTML = formatForDisplay(reply));
-};
-
-/* ================= MIC ================= */
-
-window.startVoiceInput = function () {
-  playPendingNewYearGreeting();
-
-  if (isListening || isSpeaking) {
-    stopAllVoice();
-    return;
-  }
-
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return;
-
-  recognition = new SR();
-  recognition.lang = "en-IN";
-  recognition.continuous = false;
-
-  isListening = true;
-  setSpeakListening(true);
-
-  recognition.onresult = function (e) {
-    const text = e.results[0][0].transcript;
-  document.getElementById("aiInput").value = text;
-
-if (tryPlayYouTube(text)) return;
-
-       
-    fetch("/ai/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text })
-    })
-      .then(r => r.text())
-      .then(reply => {
-        document.getElementById("aiOutput").innerHTML = formatForDisplay(reply);
-        setTimeout(() => speak(reply), 150);
-      });
-  };
-
-  recognition.onend = function () {
-    isListening = false;
-    if (!isSpeaking) setSpeakListening(false);
-  };
-
-  recognition.start();
-};
-window.installApp = async function () {
-  if (!deferredPrompt) {
-    alert("Install option not available yet. Use browser menu.");
-    return;
-  }
-
-  deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
-
-  deferredPrompt = null;
-};
-
-/* ================= NEW YEAR ================= */
-
-function playPendingNewYearGreeting() {
-  if (!newYearGreetingPending) return;
-  newYearGreetingPending = false;
-  sessionStorage.setItem("newYearGreeted", "true");
-  speak("Happy New Year! Welcome to SQL Practice.");
-}
-
-document.addEventListener("DOMContentLoaded", function () {
-  const d = new Date();
-  const isNewYear = d.getDate() === 1 && d.getMonth() === 0;
-
-  if (!isNewYear) return;
-
-  // 📱 Mobile auto-greet attempt (safe)
-  if (isMobileDevice() && !sessionStorage.getItem("newYearGreeted")) {
-    sessionStorage.setItem("newYearGreeted", "true");
-
-    // ⏱ small delay lets WebView / PWA settle
-    setTimeout(function () {
+  // Optional voice greeting (mobile only)
+  if (now >= start && now <= end && isMobileDevice()) {
+    setTimeout(() => {
       try {
         speak("Happy New Year! Welcome to SQL Practice.");
-      } catch (e) {
-        // silently ignore if browser blocks
-      }
+      } catch {}
     }, 300);
   }
 });
-
