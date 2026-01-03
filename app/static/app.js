@@ -95,28 +95,55 @@ window.toggleTables = async function () {
   const left = document.querySelector(".left");
   if (!panel) return;
 
+  // toggle hide
   if (panel.style.display === "block") {
     panel.style.display = "none";
     if (left) left.style.width = "100%";
     return;
   }
 
+  panel.style.display = "block";
+  panel.innerHTML = "⏳ Loading tables...";
+  if (left) left.style.width = "65%";
+
   try {
     const res = await fetch("/tables");
     const data = await res.json();
 
     let html = "";
-    for (const [table, obj] of Object.entries(data)) {
-      html += `<h4>${table}</h4>`;
-      html += renderTable(obj.columns, obj.rows);
+
+    // ✅ Case 1: { tables: [...] }
+    if (Array.isArray(data.tables)) {
+      html += "<ul>";
+      data.tables.forEach(t => {
+        html += `<li>${t}</li>`;
+      });
+      html += "</ul>";
     }
 
-    panel.innerHTML = html;   // ✅ FIX: render into panel itself
-    panel.style.display = "block";
-    if (left) left.style.width = "65%";
+    // ✅ Case 2: [ "table1", "table2" ]
+    else if (Array.isArray(data)) {
+      html += "<ul>";
+      data.forEach(t => {
+        html += `<li>${t}</li>`;
+      });
+      html += "</ul>";
+    }
+
+    // ✅ Case 3: full table structure
+    else {
+      for (const [table, obj] of Object.entries(data)) {
+        html += `<h4>${table}</h4>`;
+        if (obj.columns && obj.rows) {
+          html += renderTable(obj.columns, obj.rows);
+        }
+      }
+    }
+
+    panel.innerHTML = html || "⚠️ No tables found";
   } catch (e) {
+    console.error(e);
     panel.innerHTML = "❌ Failed to load tables";
-    panel.style.display = "block";
   }
 };
 
