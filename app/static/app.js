@@ -179,24 +179,24 @@ window.showAnswer = async function () {
     ${renderTable(data.cols, data.rows)}
   `;
 };
-function nextQuestion() {
+window.nextQuestion = function () {
   const qid = document.getElementById("qid");
   if (!qid) return;
 
-  qid.value = parseInt(qid.value || "1") + 1;
-  document.getElementById("output").innerHTML = "";
-}
+  const nextId = parseInt(qid.value, 10) + 1;
+  window.location.href = `/?qid=${nextId}`;
+};
 
-function prevQuestion() {
+window.prevQuestion = function () {
   const qid = document.getElementById("qid");
   if (!qid) return;
 
-  const current = parseInt(qid.value || "1");
+  const current = parseInt(qid.value, 10);
   if (current > 1) {
-    qid.value = current - 1;
-    document.getElementById("output").innerHTML = "";
+    window.location.href = `/?qid=${current - 1}`;
   }
-}
+};
+
 
 /* ================= AI ================= */
 
