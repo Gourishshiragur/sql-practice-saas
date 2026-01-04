@@ -231,10 +231,11 @@ window.askAIMentor = function () {
   const input = document.getElementById("aiInput").value;
   const out = document.getElementById("aiOutput");
 
-  if (!input.trim()) {
-    out.innerText = "Please type a question.";
-    return;
-  }
+ if (!input.trim()) {
+  // silently ignore when triggered from voice
+  return;
+}
+
 
   fetch("/tools/ai/chat", {
     method: "POST",
