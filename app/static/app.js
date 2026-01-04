@@ -2,6 +2,8 @@ console.log("✅ app.js loaded");
 
 /* ================= GLOBAL ================= */
 let isSpeaking = false;
+let recognition = null;
+let isListening = false;
 
 /* ================= UTIL ================= */
 function renderTable(cols, rows) {
@@ -25,30 +27,20 @@ function formatForDisplay(text) {
 /* ================= SPEECH ================= */
 function normalizeForSpeech(text) {
   return text
-    // ❌ remove emojis
     .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
-
-    // ❌ remove SQL & special symbols
     .replace(/[^a-zA-Z0-9., ]+/g, " ")
-
-    // ❌ remove newlines completely
-    .replace(/\n+/g, " ")
-
-    // cleanup spaces
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function setSpeakActive(active) {
   const btn = document.getElementById("speakBtn");
-  if (!btn) return;
-  btn.classList.toggle("listening", active);
+  if (btn) btn.classList.toggle("listening", active);
 }
 
 function speak(text) {
   if (!window.speechSynthesis || !text) return;
 
-  // 🔁 toggle OFF
   if (isSpeaking) {
     speechSynthesis.cancel();
     isSpeaking = false;
@@ -71,17 +63,15 @@ function speak(text) {
   setSpeakActive(true);
   speechSynthesis.speak(u);
 }
-let recognition = null;
-let isListening = false;
 
+/* ================= VOICE INPUT ================= */
 function startVoiceInput() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
-    alert("Voice input not supported in this browser");
+    alert("Voice input not supported");
     return;
   }
 
-  // toggle OFF if already listening
   if (isListening) {
     recognition.stop();
     isListening = false;
@@ -101,7 +91,7 @@ function startVoiceInput() {
     document.getElementById("aiInput").value = text;
     isListening = false;
     setSpeakActive(false);
-    askAIMentor(); // send to AI
+    askAIMentor();
   };
 
   recognition.onend = recognition.onerror = function () {
@@ -112,19 +102,16 @@ function startVoiceInput() {
   recognition.start();
 }
 
-/* ================= SPEAK BUTTON (AI ONLY) ================= */
-wwindow.handleSpeakClick = function () {
+/* ================= SPEAK BUTTON ================= */
+window.handleSpeakClick = function () {
   startVoiceInput();
 };
-
 
 /* ================= TABLES ================= */
 window.toggleTables = async function () {
   const panel = document.getElementById("tablePanel");
   const info = document.getElementById("tableInfo");
   const left = document.querySelector(".left");
-
-  if (!panel || !info) return;
 
   if (panel.style.display === "block") {
     panel.style.display = "none";
@@ -148,14 +135,9 @@ window.toggleTables = async function () {
 
 /* ================= SQL ================= */
 window.runQuery = async function () {
-  const qidEl = document.getElementById("qid");
-  const sqlEl = document.getElementById("sql");
+  const qid = document.getElementById("qid").value;
+  const sql = document.getElementById("sql").value.trim();
   const out = document.getElementById("output");
-
-  if (!qidEl || !sqlEl || !out) return;
-
-  const sql = sqlEl.value.trim();
-  const qid = qidEl.value;
 
   if (!sql) {
     out.innerHTML = "⚠️ Please enter a SQL query before running.";
@@ -171,22 +153,18 @@ window.runQuery = async function () {
   const data = await res.json();
   const isCorrect = data.status === "correct";
 
-out.innerHTML = `
-  <small style="color:#64748b;">
-    Query result based on applied SQL conditions
-  </small><br><br>
+  out.innerHTML = `
+    <small style="color:#64748b;">
+      Query result based on applied SQL conditions
+    </small><br><br>
 
-  <b style="color:${isCorrect ? "green" : "red"}; font-size:16px;">
-    ${isCorrect ? "CORRECT" : "WRONG"}
-  </b>
-  ${
-    !isCorrect
-      ? `<div><b>Correct Query:</b><pre>${data.expected_sql}</pre></div>`
-      : ""
-  }
-  ${renderTable(data.cols, data.rows)}
-`;
+    <b style="color:${isCorrect ? "green" : "red"};">
+      ${isCorrect ? "CORRECT" : "WRONG"}
+    </b>
 
+    ${!isCorrect ? `<pre>${data.expected_sql}</pre>` : ""}
+    ${renderTable(data.cols, data.rows)}
+  `;
 };
 
 window.showAnswer = async function () {
@@ -200,30 +178,20 @@ window.showAnswer = async function () {
   });
 
   const data = await res.json();
-  out.innerHTML = `
-    <b>Correct Query</b>
-    <pre>${data.expected_sql}</pre>
-    ${renderTable(data.cols, data.rows)}
-  `;
+  out.innerHTML = `<pre>${data.expected_sql}</pre>${renderTable(data.cols, data.rows)}`;
 };
 
-/* ================= NAVIGATION ================= */
-function getParam(name) {
-  return new URLSearchParams(window.location.search).get(name);
-}
-
-window.nextQuestion = function () {
-  const idx = Number(getParam("q_index") || 0);
-  const level = getParam("level") || "easy";
-  window.location.href = `/?level=${level}&q_index=${idx + 1}`;
+/* ================= NAV ================= */
+window.nextQuestion = () => {
+  const idx = Number(new URLSearchParams(location.search).get("q_index") || 0);
+  const level = new URLSearchParams(location.search).get("level") || "easy";
+  location.href = `/?level=${level}&q_index=${idx + 1}`;
 };
 
-window.prevQuestion = function () {
-  const idx = Number(getParam("q_index") || 0);
-  const level = getParam("level") || "easy";
-  if (idx > 0) {
-    window.location.href = `/?level=${level}&q_index=${idx - 1}`;
-  }
+window.prevQuestion = () => {
+  const idx = Number(new URLSearchParams(location.search).get("q_index") || 0);
+  const level = new URLSearchParams(location.search).get("level") || "easy";
+  if (idx > 0) location.href = `/?level=${level}&q_index=${idx - 1}`;
 };
 
 /* ================= AI ================= */
@@ -231,11 +199,7 @@ window.askAIMentor = function () {
   const input = document.getElementById("aiInput").value;
   const out = document.getElementById("aiOutput");
 
- if (!input.trim()) {
-  // silently ignore when triggered from voice
-  return;
-}
-
+  if (!input.trim()) return;
 
   fetch("/tools/ai/chat", {
     method: "POST",
@@ -243,9 +207,6 @@ window.askAIMentor = function () {
     body: JSON.stringify({ message: input })
   })
     .then(r => r.text())
-    .then(reply => {
-      out.innerHTML = formatForDisplay(reply);
-      // ❌ NO AUTO SPEECH
-    })
+    .then(reply => out.innerHTML = formatForDisplay(reply))
     .catch(() => out.innerText = "AI error");
 };
