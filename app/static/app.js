@@ -205,3 +205,73 @@ window.askAIMentor = function () {
     .then(reply => (out.innerHTML = formatForDisplay(reply)))
     .catch(() => (out.innerText = "AI error"));
 };
+/* ================= SPEECH ENGINE ================= */
+let isSpeaking = false;
+
+function setSpeakActive(active) {
+  const btn = document.getElementById("speakBtn");
+  if (btn) btn.classList.toggle("listening", active);
+}
+
+function normalizeForSpeech(text) {
+  return text
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")   // emojis
+    .replace(/[^a-zA-Z0-9., ]+/g, " ")       // symbols
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function speak(text) {
+  if (!window.speechSynthesis || !text) return;
+
+  // 🔁 toggle stop
+  if (isSpeaking) {
+    speechSynthesis.cancel();
+    isSpeaking = false;
+    setSpeakActive(false);
+    return;
+  }
+
+  const cleanText = normalizeForSpeech(text);
+  if (!cleanText) return;
+
+  const utter = new SpeechSynthesisUtterance(cleanText);
+  utter.lang = "en-IN";
+
+  utter.onend = () => {
+    isSpeaking = false;
+    setSpeakActive(false);
+  };
+
+  isSpeaking = true;
+  setSpeakActive(true);
+  speechSynthesis.speak(utter);
+}
+
+/* ================= SPEAK AI OUTPUT ================= */
+window.handleSpeakClick = function () {
+  const aiText = document.getElementById("aiOutput")?.innerText || "";
+
+  if (!aiText.trim()) {
+    return; // nothing to speak
+  }
+
+  speak(aiText);
+};
+/* ================= PWA INSTALL ================= */
+let deferredPrompt = null;
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+
+  const btn = document.getElementById("installBtn");
+  if (btn) btn.style.display = "inline-block";
+});
+
+window.installApp = async function () {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+};
