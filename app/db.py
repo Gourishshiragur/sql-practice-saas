@@ -9,6 +9,9 @@ def init_db():
     conn = get_connection()
     cur = conn.cursor()
 
+    # =========================
+    # EMPLOYEES TABLE
+    # =========================
     cur.execute("""
     CREATE TABLE IF NOT EXISTS employees (
         id INTEGER,
@@ -31,5 +34,30 @@ def init_db():
         ]
     )
 
+    # =========================
+    # DEPARTMENTS TABLE (NEW)
+    # =========================
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS departments (
+        id INTEGER,
+        department TEXT
+    )
+    """)
+
+    cur.execute("DELETE FROM departments")
+
+    cur.executemany(
+        "INSERT INTO departments VALUES (?, ?)",
+        [
+            (1, "IT"),
+            (2, "HR"),
+            (3, "Finance")
+        ]
+    )
+
     conn.commit()
     conn.close()
+
+    print("✅ Database initialized with employees & departments")
+if __name__ == "__main__":
+    init_db()
