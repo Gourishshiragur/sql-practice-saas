@@ -1,4 +1,6 @@
 console.log("✅ app.js loaded");
+
+/* ================= LEVEL & STORAGE ================= */
 function getLevel() {
   return new URLSearchParams(location.search).get("level") || "easy";
 }
@@ -9,8 +11,9 @@ function getProgressKey() {
 
 function loadProgress() {
   return JSON.parse(localStorage.getItem(getProgressKey())) || {
-    attempted: 0,
-    correct: 0
+    visited: {},
+    attempted: {},
+    correct: {}
   };
 }
 
@@ -18,63 +21,61 @@ function saveProgress(data) {
   localStorage.setItem(getProgressKey(), JSON.stringify(data));
 }
 
+/* ================= PROGRESS UI ================= */
 function updateProgressUI() {
   const data = loadProgress();
-  const total = Number(document.querySelector("p")?.innerText.match(/of (\d+)/)?.[1]) || 1;
 
-  const attemptedPct = Math.round((data.attempted / total) * 100);
-  const scorePct = data.attempted
-    ? Math.round((data.correct / data.attempted) * 100)
+  const total =
+    Number(document.querySelector("p")?.innerText.match(/of (\d+)/)?.[1]) || 1;
+
+  const visitedCount = Object.keys(data.visited).length;
+  const attemptedCount = Object.keys(data.attempted).length;
+  const correctCount = Object.keys(data.correct).length;
+
+  const progressPct = Math.round((visitedCount / total) * 100);
+  const scorePct = attemptedCount
+    ? Math.round((correctCount / attemptedCount) * 100)
     : 0;
 
-  document.getElementById("progressBar").style.width = attemptedPct + "%";
-  document.getElementById("progressText").innerText =
-    `Attempted: ${data.attempted}/${total} (${attemptedPct}%)`;
-  document.getElementById("scoreText").innerText =
-    `Score: ${scorePct}%`;
+  const bar = document.getElementById("progressBar");
+  if (bar) {
+    bar.style.width = progressPct + "%";
+    bar.style.background =
+      scorePct >= 70 ? "#22c55e" : scorePct >= 40 ? "#facc15" : "#ef4444";
+  }
+
+  const progressText = document.getElementById("progressText");
+  const scoreText = document.getElementById("scoreText");
+
+  if (progressText)
+    progressText.innerText = `Visited: ${visitedCount}/${total} (${progressPct}%)`;
+
+  if (scoreText)
+    scoreText.innerText = `Score: ${scorePct}%`;
 }
 
-/* ================= PWA SERVICE WORKER ================= */
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/static/service-worker.js")
-      .then(() => console.log("✅ Service Worker registered"))
-      .catch(err => console.error("❌ SW registration failed", err));
-  });
-}
-/* ================= PWA INSTALL PROMPT ================= */
-let deferredPrompt = null;
+/* ================= MARK VISITED ON LOAD ================= */
+document.addEventListener("DOMContentLoaded", () => {
+  const progress = loadProgress();
+  const qid = document.getElementById("qid")?.value;
 
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
+  if (qid && !progress.visited[qid]) {
+    progress.visited[qid] = true;
+    saveProgress(progress);
+  }
 
-  const btn = document.getElementById("installBtn");
-  if (btn) btn.style.display = "inline-block";
+  updateProgressUI();
 });
 
-window.installApp = async function () {
-  if (!deferredPrompt) return;
-  deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
-  deferredPrompt = null;
-};
-
-/* ================= GLOBAL ================= */
-let isSpeaking = false;
-let recognition = null;
-let isListening = false;
-
-/* ================= UTIL ================= */
+/* ================= TABLE RENDER ================= */
 function renderTable(cols, rows) {
   let html = "<table><tr>";
-  cols.forEach(c => html += `<th>${c}</th>`);
+  cols.forEach(c => (html += `<th>${c}</th>`));
   html += "</tr>";
 
   rows.forEach(r => {
     html += "<tr>";
-    r.forEach(v => html += `<td>${v}</td>`);
+    r.forEach(v => (html += `<td>${v ?? ""}</td>`));
     html += "</tr>";
   });
 
@@ -85,98 +86,15 @@ function formatForDisplay(text) {
   return text.replace(/\n/g, "<br>");
 }
 
-/* ================= SPEECH ================= */
-function normalizeForSpeech(text) {
-  return text
-    .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
-    .replace(/[^a-zA-Z0-9., ]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function setSpeakActive(active) {
-  const btn = document.getElementById("speakBtn");
-  if (btn) btn.classList.toggle("listening", active);
-}
-
-function speak(text) {
-  if (!window.speechSynthesis || !text) return;
-
-  if (isSpeaking) {
-    speechSynthesis.cancel();
-    isSpeaking = false;
-    setSpeakActive(false);
-    return;
-  }
-
-  const cleanText = normalizeForSpeech(text);
-  if (!cleanText) return;
-
-  const u = new SpeechSynthesisUtterance(cleanText);
-  u.lang = "en-IN";
-
-  u.onend = () => {
-    isSpeaking = false;
-    setSpeakActive(false);
-  };
-
-  isSpeaking = true;
-  setSpeakActive(true);
-  speechSynthesis.speak(u);
-}
-
-/* ================= VOICE INPUT ================= */
-function startVoiceInput() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    alert("Voice input not supported");
-    return;
-  }
-
-  if (isListening) {
-    recognition.stop();
-    isListening = false;
-    setSpeakActive(false);
-    return;
-  }
-
-  recognition = new SR();
-  recognition.lang = "en-IN";
-  recognition.continuous = false;
-
-  isListening = true;
-  setSpeakActive(true);
-
-  recognition.onresult = function (e) {
-    const text = e.results[0][0].transcript;
-    document.getElementById("aiInput").value = text;
-    isListening = false;
-    setSpeakActive(false);
-    askAIMentor();
-  };
-
-  recognition.onend = recognition.onerror = function () {
-    isListening = false;
-    setSpeakActive(false);
-  };
-
-  recognition.start();
-}
-
-/* ================= SPEAK BUTTON ================= */
-window.handleSpeakClick = function () {
-  startVoiceInput();
-};
-
 /* ================= TABLES ================= */
 window.toggleTables = async function () {
   const panel = document.getElementById("tablePanel");
   const info = document.getElementById("tableInfo");
-  const left = document.querySelector(".left");
+
+  if (!panel || !info) return;
 
   if (panel.style.display === "block") {
     panel.style.display = "none";
-    if (left) left.style.width = "100%";
     return;
   }
 
@@ -213,30 +131,37 @@ window.runQuery = async function () {
 
   const data = await res.json();
   const isCorrect = data.status === "correct";
-  const progress = loadProgress();
-progress.attempted += 1;
-if (isCorrect) progress.correct += 1;
-saveProgress(progress);
-updateProgressUI();
 
+  // 🔒 SCORE LOCK LOGIC
+  const progress = loadProgress();
+
+  if (!progress.attempted[qid]) {
+    progress.attempted[qid] = true;
+    if (isCorrect) progress.correct[qid] = true;
+    saveProgress(progress);
+    updateProgressUI();
+  }
 
   out.innerHTML = `
-    <small style="color:#64748b;">
-      Query result based on applied SQL conditions
-    </small><br><br>
-
     <b style="color:${isCorrect ? "green" : "red"};">
       ${isCorrect ? "CORRECT" : "WRONG"}
     </b>
-
     ${!isCorrect ? `<pre>${data.expected_sql}</pre>` : ""}
     ${renderTable(data.cols, data.rows)}
   `;
 };
 
+/* ================= SHOW ANSWER ================= */
 window.showAnswer = async function () {
   const qid = document.getElementById("qid").value;
   const out = document.getElementById("output");
+
+  const progress = loadProgress();
+  if (!progress.attempted[qid]) {
+    progress.attempted[qid] = true;
+    saveProgress(progress);
+    updateProgressUI();
+  }
 
   const res = await fetch("/show-answer", {
     method: "POST",
@@ -248,29 +173,28 @@ window.showAnswer = async function () {
   out.innerHTML = `<pre>${data.expected_sql}</pre>${renderTable(data.cols, data.rows)}`;
 };
 
-/* ================= NAV ================= */
+/* ================= NAVIGATION ================= */
 window.nextQuestion = () => {
   const idx = Number(new URLSearchParams(location.search).get("q_index") || 0);
-  const level = new URLSearchParams(location.search).get("level") || "easy";
+  const level = getLevel();
   location.href = `/?level=${level}&q_index=${idx + 1}`;
 };
 
 window.prevQuestion = () => {
   const idx = Number(new URLSearchParams(location.search).get("q_index") || 0);
-  const level = new URLSearchParams(location.search).get("level") || "easy";
+  const level = getLevel();
   if (idx > 0) location.href = `/?level=${level}&q_index=${idx - 1}`;
 };
 
 /* ================= AI ================= */
 window.askAIMentor = function () {
-  const input = document.getElementById("aiInput").value;
+  const input = document.getElementById("aiInput").value.trim();
   const out = document.getElementById("aiOutput");
 
-if (!input.trim()) {
-  out.innerText = "Type something to ask";
-  return;
-}
-
+  if (!input) {
+    out.innerText = "Type something to ask";
+    return;
+  }
 
   fetch("/tools/ai/chat", {
     method: "POST",
@@ -278,11 +202,6 @@ if (!input.trim()) {
     body: JSON.stringify({ message: input })
   })
     .then(r => r.text())
-    .then(reply => out.innerHTML = formatForDisplay(reply))
-    .catch(() => out.innerText = "AI error");
+    .then(reply => (out.innerHTML = formatForDisplay(reply)))
+    .catch(() => (out.innerText = "AI error"));
 };
-document.addEventListener("DOMContentLoaded", updateProgressUI);
-const bar = document.getElementById("progressBar");
-if (scorePct >= 70) bar.style.background = "#22c55e";
-else if (scorePct >= 40) bar.style.background = "#facc15";
-else bar.style.background = "#ef4444";
