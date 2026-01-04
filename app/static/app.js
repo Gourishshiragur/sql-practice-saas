@@ -1,4 +1,39 @@
 console.log("✅ app.js loaded");
+function getLevel() {
+  return new URLSearchParams(location.search).get("level") || "easy";
+}
+
+function getProgressKey() {
+  return `progress_${getLevel()}`;
+}
+
+function loadProgress() {
+  return JSON.parse(localStorage.getItem(getProgressKey())) || {
+    attempted: 0,
+    correct: 0
+  };
+}
+
+function saveProgress(data) {
+  localStorage.setItem(getProgressKey(), JSON.stringify(data));
+}
+
+function updateProgressUI() {
+  const data = loadProgress();
+  const total = Number(document.querySelector("p")?.innerText.match(/of (\d+)/)?.[1]) || 1;
+
+  const attemptedPct = Math.round((data.attempted / total) * 100);
+  const scorePct = data.attempted
+    ? Math.round((data.correct / data.attempted) * 100)
+    : 0;
+
+  document.getElementById("progressBar").style.width = attemptedPct + "%";
+  document.getElementById("progressText").innerText =
+    `Attempted: ${data.attempted}/${total} (${attemptedPct}%)`;
+  document.getElementById("scoreText").innerText =
+    `Score: ${scorePct}%`;
+}
+
 /* ================= PWA SERVICE WORKER ================= */
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -178,6 +213,12 @@ window.runQuery = async function () {
 
   const data = await res.json();
   const isCorrect = data.status === "correct";
+  const progress = loadProgress();
+progress.attempted += 1;
+if (isCorrect) progress.correct += 1;
+saveProgress(progress);
+updateProgressUI();
+
 
   out.innerHTML = `
     <small style="color:#64748b;">
@@ -240,3 +281,8 @@ if (!input.trim()) {
     .then(reply => out.innerHTML = formatForDisplay(reply))
     .catch(() => out.innerText = "AI error");
 };
+document.addEventListener("DOMContentLoaded", updateProgressUI);
+const bar = document.getElementById("progressBar");
+if (scorePct >= 70) bar.style.background = "#22c55e";
+else if (scorePct >= 40) bar.style.background = "#facc15";
+else bar.style.background = "#ef4444";
