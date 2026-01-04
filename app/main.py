@@ -6,13 +6,16 @@ from fastapi.templating import Jinja2Templates
 from app.questions import QUESTIONS
 from app.routes.tools import router as tools_router
 from app.db import get_connection   # make sure this exists
-
+from app.db import init_db
 # =========================
 # APP SETUP
 # =========================
 app = FastAPI()
 
+init_db()  # database recreated on startup
+
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
 templates = Jinja2Templates(directory="app/templates")
 
 # =========================

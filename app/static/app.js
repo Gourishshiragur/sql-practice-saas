@@ -225,7 +225,11 @@ window.askAIMentor = function () {
   const input = document.getElementById("aiInput").value;
   const out = document.getElementById("aiOutput");
 
-  if (!input.trim()) return;
+if (!input.trim()) {
+  out.innerText = "Type something to ask";
+  return;
+}
+
 
   fetch("/tools/ai/chat", {
     method: "POST",

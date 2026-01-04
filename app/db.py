@@ -6,17 +6,13 @@ def get_connection():
     return sqlite3.connect(DB, check_same_thread=False)
 
 def init_db():
+    import os
+    if os.path.exists(DB):
+        os.remove(DB)
+
     conn = get_connection()
     cur = conn.cursor()
 
-    # =========================
-    # DROP OLD TABLE (CRITICAL)
-    # =========================
-    cur.execute("DROP TABLE IF EXISTS employees")
-
-    # =========================
-    # EMPLOYEES TABLE (FIXED)
-    # =========================
     cur.execute("""
     CREATE TABLE employees (
         id INTEGER,
@@ -38,28 +34,5 @@ def init_db():
         ]
     )
 
-    # =========================
-    # DEPARTMENTS TABLE
-    # =========================
-    cur.execute("DROP TABLE IF EXISTS departments")
-
-    cur.execute("""
-    CREATE TABLE departments (
-        id INTEGER,
-        department TEXT
-    )
-    """)
-
-    cur.executemany(
-        "INSERT INTO departments VALUES (?, ?)",
-        [
-            (1, "IT"),
-            (2, "HR"),
-            (3, "Finance")
-        ]
-    )
-
     conn.commit()
     conn.close()
-
-    print("✅ Database initialized correctly with hire_date")
