@@ -45,6 +45,26 @@ function renderTable(cols, rows) {
 function formatForDisplay(text) {
   return text.replace(/\n/g, "<br>");
 }
+/* ================= SPEAK UI STATE (RESTORED) ================= */
+
+function setSpeakListening(active) {
+  const btn = document.getElementById("speakBtn");
+  const stopBtn = document.getElementById("stopBtn");
+
+  if (btn) btn.classList.toggle("listening", active);
+  if (stopBtn) stopBtn.style.display = active ? "inline-block" : "none";
+}
+
+function stopSpeaking() {
+  if (recognition) {
+    try { recognition.stop(); } catch {}
+  }
+  if (window.speechSynthesis) {
+    speechSynthesis.cancel();
+  }
+  isListening = false;
+  setSpeakListening(false);
+}
 
 /* ================= SPEAK ================= */
 
@@ -57,6 +77,8 @@ function speak(text) {
 
 /* ================= SHOW TABLES ================= */
 
+/* ================= SQL ================= */
+
 window.toggleTables = async function () {
   const panel = document.getElementById("tablePanel");
   const info = document.getElementById("tableInfo");
@@ -64,6 +86,7 @@ window.toggleTables = async function () {
 
   if (!panel || !info) return;
 
+  // toggle close
   if (panel.style.display === "block") {
     panel.style.display = "none";
     if (left) left.style.width = "100%";
@@ -84,12 +107,13 @@ window.toggleTables = async function () {
       html += renderTable(obj.columns, obj.rows);
     }
 
-    info.innerHTML = html || "No tables found";
+    info.innerHTML = html || "⚠️ No tables found";
   } catch (e) {
     console.error(e);
     info.innerHTML = "❌ Failed to load tables";
   }
 };
+
 
 /* ================= SQL ================= */
 
@@ -164,13 +188,34 @@ window.startVoiceInput = function () {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return;
 
+  // toggle OFF if already listening
+  if (isListening) {
+    stopSpeaking();
+    return;
+  }
+
   recognition = new SR();
   recognition.lang = "en-IN";
-  recognition.start();
+  recognition.continuous = false;
 
-  recognition.onresult = e => {
+  isListening = true;
+  setSpeakListening(true);
+
+  recognition.onresult = function (e) {
     const text = e.results[0][0].transcript;
     document.getElementById("aiInput").value = text;
     askAIMentor();
   };
+
+  recognition.onend = function () {
+    isListening = false;
+    setSpeakListening(false);
+  };
+
+  recognition.onerror = function () {
+    isListening = false;
+    setSpeakListening(false);
+  };
+
+  recognition.start();
 };
