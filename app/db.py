@@ -10,41 +10,45 @@ def init_db():
     cur = conn.cursor()
 
     # =========================
-    # EMPLOYEES TABLE
+    # DROP OLD TABLE (CRITICAL)
+    # =========================
+    cur.execute("DROP TABLE IF EXISTS employees")
+
+    # =========================
+    # EMPLOYEES TABLE (FIXED)
     # =========================
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS employees (
+    CREATE TABLE employees (
         id INTEGER,
         name TEXT,
         department TEXT,
-        salary INTEGER
+        salary INTEGER,
+        hire_date TEXT
     )
     """)
 
-    cur.execute("DELETE FROM employees")
-
     cur.executemany(
-  "INSERT INTO employees VALUES (?, ?, ?, ?, ?)",
-  [
-    (1, "Alice", "IT", 70000, "2022-01-15"),
-    (2, "Bob", "HR", 50000, "2021-06-10"),
-    (3, "Charlie", "IT", 80000, "2020-09-01"),
-    (4, "David", "Finance", 60000, "2019-11-20"),
-    (5, "Eva", "HR", 55000, "2023-02-05"),
-  ]
-)
+        "INSERT INTO employees VALUES (?, ?, ?, ?, ?)",
+        [
+            (1, "Alice", "IT", 70000, "2022-01-15"),
+            (2, "Bob", "HR", 50000, "2021-06-10"),
+            (3, "Charlie", "IT", 80000, "2020-09-01"),
+            (4, "David", "Finance", 60000, "2019-11-20"),
+            (5, "Eva", "HR", 55000, "2023-02-05"),
+        ]
+    )
 
     # =========================
-    # DEPARTMENTS TABLE (NEW)
+    # DEPARTMENTS TABLE
     # =========================
+    cur.execute("DROP TABLE IF EXISTS departments")
+
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS departments (
+    CREATE TABLE departments (
         id INTEGER,
         department TEXT
     )
     """)
-
-    cur.execute("DELETE FROM departments")
 
     cur.executemany(
         "INSERT INTO departments VALUES (?, ?)",
@@ -58,5 +62,4 @@ def init_db():
     conn.commit()
     conn.close()
 
-    print("✅ Database initialized with employees & departments")
-
+    print("✅ Database initialized correctly with hire_date")
