@@ -24,15 +24,15 @@ def init_db():
     cur.execute("DELETE FROM employees")
 
     cur.executemany(
-        "INSERT INTO employees VALUES (?, ?, ?, ?)",
-        [
-            (1, "Alice", "IT", 70000),
-            (2, "Bob", "HR", 50000),
-            (3, "Charlie", "IT", 80000),
-            (4, "David", "Finance", 60000),
-            (5, "Eva", "HR", 55000)
-        ]
-    )
+  "INSERT INTO employees VALUES (?, ?, ?, ?, ?)",
+  [
+    (1, "Alice", "IT", 70000, "2022-01-15"),
+    (2, "Bob", "HR", 50000, "2021-06-10"),
+    (3, "Charlie", "IT", 80000, "2020-09-01"),
+    (4, "David", "Finance", 60000, "2019-11-20"),
+    (5, "Eva", "HR", 55000, "2023-02-05"),
+  ]
+)
 
     # =========================
     # DEPARTMENTS TABLE (NEW)
@@ -59,5 +59,4 @@ def init_db():
     conn.close()
 
     print("✅ Database initialized with employees & departments")
-if __name__ == "__main__":
-    init_db()
+

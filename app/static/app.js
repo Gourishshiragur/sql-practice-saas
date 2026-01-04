@@ -71,12 +71,52 @@ function speak(text) {
   setSpeakActive(true);
   speechSynthesis.speak(u);
 }
+let recognition = null;
+let isListening = false;
+
+function startVoiceInput() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    alert("Voice input not supported in this browser");
+    return;
+  }
+
+  // toggle OFF if already listening
+  if (isListening) {
+    recognition.stop();
+    isListening = false;
+    setSpeakActive(false);
+    return;
+  }
+
+  recognition = new SR();
+  recognition.lang = "en-IN";
+  recognition.continuous = false;
+
+  isListening = true;
+  setSpeakActive(true);
+
+  recognition.onresult = function (e) {
+    const text = e.results[0][0].transcript;
+    document.getElementById("aiInput").value = text;
+    isListening = false;
+    setSpeakActive(false);
+    askAIMentor(); // send to AI
+  };
+
+  recognition.onend = recognition.onerror = function () {
+    isListening = false;
+    setSpeakActive(false);
+  };
+
+  recognition.start();
+}
 
 /* ================= SPEAK BUTTON (AI ONLY) ================= */
-window.handleSpeakClick = function () {
-  const aiText = document.getElementById("aiOutput")?.innerText || "";
-  speak(aiText);
+wwindow.handleSpeakClick = function () {
+  startVoiceInput();
 };
+
 
 /* ================= TABLES ================= */
 window.toggleTables = async function () {
