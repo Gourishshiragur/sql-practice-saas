@@ -131,17 +131,22 @@ window.runQuery = async function () {
   const data = await res.json();
   const isCorrect = data.status === "correct";
 
-  out.innerHTML = `
-    <b style="color:${isCorrect ? "green" : "red"}; font-size:16px;">
-      ${isCorrect ? "CORRECT" : "WRONG"}
-    </b>
-    ${
-      !isCorrect
-        ? `<div><b>Correct Query:</b><pre>${data.expected_sql}</pre></div>`
-        : ""
-    }
-    ${renderTable(data.cols, data.rows)}
-  `;
+out.innerHTML = `
+  <small style="color:#64748b;">
+    Query result based on applied SQL conditions
+  </small><br><br>
+
+  <b style="color:${isCorrect ? "green" : "red"}; font-size:16px;">
+    ${isCorrect ? "CORRECT" : "WRONG"}
+  </b>
+  ${
+    !isCorrect
+      ? `<div><b>Correct Query:</b><pre>${data.expected_sql}</pre></div>`
+      : ""
+  }
+  ${renderTable(data.cols, data.rows)}
+`;
+
 };
 
 window.showAnswer = async function () {
