@@ -25,6 +25,12 @@
       margin: 8px 0;
       font-weight: bold;
     }
+.sidebar a.active {
+  background: #38bdf8;
+  color: #0f172a;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
 
     .main {
       flex: 1;
@@ -117,9 +123,10 @@
 <!-- SIDEBAR -->
 <div class="sidebar">
   <h1>SQL Practice</h1>
-  <a href="/?level=easy">Easy</a>
-  <a href="/?level=medium">Medium</a>
-  <a href="/?level=hard">Hard</a>
+ <a href="/?level=easy" class="{{ 'active' if level == 'easy' else '' }}">Easy</a>
+<a href="/?level=medium" class="{{ 'active' if level == 'medium' else '' }}">Medium</a>
+<a href="/?level=hard" class="{{ 'active' if level == 'hard' else '' }}">Hard</a>
+
 </div>
 
 <!-- MAIN -->
