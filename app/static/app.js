@@ -179,6 +179,24 @@ window.showAnswer = async function () {
     ${renderTable(data.cols, data.rows)}
   `;
 };
+function nextQuestion() {
+  const qid = document.getElementById("qid");
+  if (!qid) return;
+
+  qid.value = parseInt(qid.value || "1") + 1;
+  document.getElementById("output").innerHTML = "";
+}
+
+function prevQuestion() {
+  const qid = document.getElementById("qid");
+  if (!qid) return;
+
+  const current = parseInt(qid.value || "1");
+  if (current > 1) {
+    qid.value = current - 1;
+    document.getElementById("output").innerHTML = "";
+  }
+}
 
 /* ================= AI ================= */
 
