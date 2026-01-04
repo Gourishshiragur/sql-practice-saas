@@ -73,29 +73,51 @@ def tables():
 # =========================
 @app.post("/run")
 def run_query(user_sql: str = Form(...), qid: str = Form(...)):
+    conn = get_connection()
+    cur = conn.cursor()
+
     for level in QUESTIONS:
         for q in QUESTIONS[level]:
             if q["qid"] == qid:
                 correct = q["expected_sql"].strip().lower() == user_sql.strip().lower()
+
+                # ✅ Always run expected SQL on DB for display
+                cur.execute(q["expected_sql"])
+                rows = cur.fetchall()
+
+                conn.close()
                 return {
                     "status": "correct" if correct else "wrong",
                     "expected_sql": q["expected_sql"],
                     "cols": q["result"]["cols"],
-                    "rows": q["result"]["rows"],
+                    "rows": rows
                 }
+
+    conn.close()
     return {"status": "error"}
+
 
 @app.post("/show-answer")
 def show_answer(qid: str = Form(...)):
+    conn = get_connection()
+    cur = conn.cursor()
+
     for level in QUESTIONS:
         for q in QUESTIONS[level]:
             if q["qid"] == qid:
+                cur.execute(q["expected_sql"])
+                rows = cur.fetchall()
+
+                conn.close()
                 return {
                     "expected_sql": q["expected_sql"],
                     "cols": q["result"]["cols"],
-                    "rows": q["result"]["rows"],
+                    "rows": rows
                 }
+
+    conn.close()
     return {"status": "error"}
+
 
 # =========================
 # HEALTH

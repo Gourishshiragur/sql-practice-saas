@@ -25,12 +25,16 @@ function formatForDisplay(text) {
 /* ================= SPEECH ================= */
 function normalizeForSpeech(text) {
   return text
-    // remove emojis
+    // ❌ remove emojis
     .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
-    // remove symbols
-    .replace(/[\/\\|_*#@₹$%^&+=<>]/g, "")
-    .replace(/_/g, " ")
-    .replace(/\n/g, ". ")
+
+    // ❌ remove SQL & special symbols
+    .replace(/[^a-zA-Z0-9., ]+/g, " ")
+
+    // ❌ remove newlines completely
+    .replace(/\n+/g, " ")
+
+    // cleanup spaces
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -44,7 +48,7 @@ function setSpeakActive(active) {
 function speak(text) {
   if (!window.speechSynthesis || !text) return;
 
-  // 🔁 Toggle OFF
+  // 🔁 toggle OFF
   if (isSpeaking) {
     speechSynthesis.cancel();
     isSpeaking = false;
@@ -68,14 +72,10 @@ function speak(text) {
   speechSynthesis.speak(u);
 }
 
-/* ================= SPEAK BUTTON (ONLY TRIGGER) ================= */
+/* ================= SPEAK BUTTON (AI ONLY) ================= */
 window.handleSpeakClick = function () {
-  const text =
-    document.getElementById("output")?.innerText ||
-    document.getElementById("aiOutput")?.innerText ||
-    "";
-
-  speak(text);
+  const aiText = document.getElementById("aiOutput")?.innerText || "";
+  speak(aiText);
 };
 
 /* ================= TABLES ================= */
@@ -133,7 +133,7 @@ window.runQuery = async function () {
 
   out.innerHTML = `
     <b style="color:${isCorrect ? "green" : "red"}; font-size:16px;">
-      ${isCorrect ? "✅ CORRECT" : "❌ WRONG"}
+      ${isCorrect ? "CORRECT" : "WRONG"}
     </b>
     ${
       !isCorrect
@@ -156,7 +156,7 @@ window.showAnswer = async function () {
 
   const data = await res.json();
   out.innerHTML = `
-    <b>✔ Correct Query</b>
+    <b>Correct Query</b>
     <pre>${data.expected_sql}</pre>
     ${renderTable(data.cols, data.rows)}
   `;
@@ -199,7 +199,7 @@ window.askAIMentor = function () {
     .then(r => r.text())
     .then(reply => {
       out.innerHTML = formatForDisplay(reply);
-      // ❌ NO AUTO SPEAK HERE
+      // ❌ NO AUTO SPEECH
     })
     .catch(() => out.innerText = "AI error");
 };
