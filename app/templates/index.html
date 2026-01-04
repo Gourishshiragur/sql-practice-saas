@@ -2,6 +2,119 @@
 <html>
 <head>
   <title>SQL Practice</title>
+
+  <!-- =====================
+        CSS (RESTORED)
+  ====================== -->
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      background: #f4f6fb;
+    }
+
+    .sidebar {
+      width: 220px;
+      background: #1f4f5f;
+      color: white;
+      padding: 20px;
+    }
+
+    .sidebar a {
+      color: white;
+      text-decoration: none;
+      display: block;
+      margin: 8px 0;
+      font-weight: bold;
+    }
+
+    .main {
+      flex: 1;
+      padding: 30px;
+      display: flex;
+      gap: 20px;
+    }
+
+    .left {
+      width: 100%;
+    }
+
+    .right {
+      width: 35%;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    textarea {
+      width: 80%;
+      height: 120px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+
+    /* ========= BLUE BUTTON THEME ========= */
+    button {
+      background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      margin-right: 8px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 10px rgba(14,165,233,0.3);
+    }
+
+    button:hover:not(.disabled):not(.active):not(.listening) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(14,165,233,0.45);
+    }
+
+    button:active {
+      transform: scale(0.96);
+    }
+
+    button.listening {
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+      animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
+      70% { box-shadow: 0 0 0 12px rgba(239,68,68,0); }
+      100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 8px;
+      font-size: 12px;
+    }
+
+    th {
+      background: #f1f5f9;
+    }
+
+    tr:nth-child(even) {
+      background: #f8fafc;
+    }
+  </style>
+
+  <!-- JS -->
   <script src="/static/app.js" defer></script>
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#1f4f5f">
@@ -9,15 +122,18 @@
 
 <body>
 
+<!-- SIDEBAR -->
 <div class="sidebar">
   <h1>SQL Practice</h1>
-  <a href="/?level=easy">Easy</a><br>
-  <a href="/?level=medium">Medium</a><br>
+  <a href="/?level=easy">Easy</a>
+  <a href="/?level=medium">Medium</a>
   <a href="/?level=hard">Hard</a>
 </div>
 
+<!-- MAIN -->
 <div class="main">
 
+  <!-- LEFT -->
   <div class="left">
 
     <div class="card">
@@ -28,7 +144,7 @@
 
     <div class="card">
       <input type="hidden" id="qid" value="{{ q.id }}">
-      <textarea id="sql"></textarea><br><br>
+      <textarea id="sql" placeholder="Write SQL here..."></textarea><br><br>
 
       <button onclick="runQuery()">Run</button>
       <button onclick="showAnswer()">I don’t know</button>
@@ -39,8 +155,10 @@
     <div class="card">
       <h3>🤖 AI Assistant</h3>
       <input id="aiInput" placeholder="Ask anything">
+      <br><br>
       <button onclick="askAIMentor()">Ask</button>
-      <button onclick="startVoiceInput()">🎤 Speak</button>
+      <button id="speakBtn" onclick="startVoiceInput()">🎤 Speak</button>
+      <button id="stopBtn" onclick="stopSpeaking()" style="display:none;">⏹ Stop</button>
       <p id="aiOutput"></p>
     </div>
 
@@ -50,41 +168,13 @@
 
   </div>
 
+  <!-- RIGHT -->
   <div class="right" id="tablePanel" style="display:none">
     <div class="card">
       <h3>Available Tables</h3>
       <div id="tableInfo"></div>
     </div>
   </div>
-/* ========= FORCE RESTORE THEME ========= */
-
-button {
-  background: linear-gradient(135deg, #38bdf8, #0ea5e9) !important;
-  color: white !important;
-  border: none !important;
-  padding: 10px 18px !important;
-  border-radius: 8px !important;
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  cursor: pointer !important;
-  box-shadow: 0 4px 10px rgba(14,165,233,0.3) !important;
-}
-
-button:hover:not(.disabled):not(.active):not(.listening) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(14,165,233,0.45);
-}
-
-button.listening {
-  background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
-  animation: pulse 1.2s infinite;
-}
-
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
-  70% { box-shadow: 0 0 0 12px rgba(239,68,68,0); }
-  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
-}
 
 </div>
 
