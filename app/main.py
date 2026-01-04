@@ -1,13 +1,11 @@
-
 from fastapi import FastAPI, Request, Form
-
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
 from app.questions import QUESTIONS
 from app.routes.tools import router as tools_router
-
-
+from app.db import get_connection   # make sure this exists
 
 # =========================
 # APP SETUP
@@ -43,7 +41,7 @@ def home(request: Request, level: str = "easy", q_index: int = 0):
     )
 
 # =========================
-# SQL CHECK
+# TABLES (ONLY ONE API)
 # =========================
 @app.get("/tables")
 def tables():
@@ -70,7 +68,9 @@ def tables():
     conn.close()
     return result
 
-
+# =========================
+# SQL CHECK
+# =========================
 @app.post("/run")
 def run_query(user_sql: str = Form(...), qid: str = Form(...)):
     for level in QUESTIONS:
@@ -98,21 +98,8 @@ def show_answer(qid: str = Form(...)):
     return {"status": "error"}
 
 # =========================
-# TABLES
+# HEALTH
 # =========================
-@app.get("/tables")
-def tables():
-    return {
-        "employees": {
-            "columns": ["id", "name", "department", "salary", "hire_date"],
-            "rows": [
-                [1, "Alice", "IT", 60000, "2021-03-01"],
-                [2, "Bob", "HR", 45000, "2020-07-15"],
-                [3, "Charlie", "IT", 70000, "2019-11-20"],
-            ],
-        }
-    }
-
 @app.get("/health")
 def health():
     return {"status": "ok"}

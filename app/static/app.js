@@ -4,10 +4,6 @@ console.log("✅ app.js loaded");
 
 let deferredPrompt = null;
 
-function isIOS() {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent);
-}
-
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
@@ -15,16 +11,9 @@ window.addEventListener("beforeinstallprompt", (e) => {
   if (btn) btn.style.display = "inline-block";
 });
 
-window.addEventListener("load", () => {
-  if (isIOS()) {
-    const hint = document.getElementById("installHint");
-    if (hint) hint.style.display = "block";
-  }
-});
-
 window.installApp = async function () {
   if (!deferredPrompt) {
-    alert("Install option not available yet. Use browser menu.");
+    alert("Install option not available yet.");
     return;
   }
   deferredPrompt.prompt();
@@ -32,38 +21,24 @@ window.installApp = async function () {
   deferredPrompt = null;
 };
 
-/* ================= GLOBAL STATE ================= */
+/* ================= GLOBAL ================= */
 
-let isListening = false;
-let isSpeaking = false;
 let recognition = null;
-let newYearGreetingPending = false;
-
-/* ================= DEVICE ================= */
-
-function isMobileDevice() {
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
-
-/* ================= VOICE INIT ================= */
-
-if (window.speechSynthesis) {
-  window.speechSynthesis.onvoiceschanged = () => {
-    speechSynthesis.getVoices();
-  };
-}
+let isListening = false;
 
 /* ================= UTIL ================= */
 
 function renderTable(cols, rows) {
-  let html = "<table border='1'><tr>";
+  let html = "<table><tr>";
   cols.forEach(c => html += `<th>${c}</th>`);
   html += "</tr>";
+
   rows.forEach(r => {
     html += "<tr>";
     r.forEach(v => html += `<td>${v}</td>`);
     html += "</tr>";
   });
+
   return html + "</table>";
 }
 
@@ -71,31 +46,24 @@ function formatForDisplay(text) {
   return text.replace(/\n/g, "<br>");
 }
 
-function cleanForSpeech(text) {
-  return text
-    .replace(/[*`]/g, "")
-    .replace(/\n/g, ". ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 /* ================= SPEAK ================= */
 
 function speak(text) {
   if (!window.speechSynthesis) return;
-  const utter = new SpeechSynthesisUtterance(cleanForSpeech(text));
-  utter.lang = "en-IN";
-  speechSynthesis.speak(utter);
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "en-IN";
+  speechSynthesis.speak(u);
 }
 
-/* ================= SHOW TABLES (FIXED) ================= */
+/* ================= SHOW TABLES ================= */
 
 window.toggleTables = async function () {
   const panel = document.getElementById("tablePanel");
+  const info = document.getElementById("tableInfo");
   const left = document.querySelector(".left");
-  if (!panel) return;
 
-  // toggle hide
+  if (!panel || !info) return;
+
   if (panel.style.display === "block") {
     panel.style.display = "none";
     if (left) left.style.width = "100%";
@@ -103,7 +71,7 @@ window.toggleTables = async function () {
   }
 
   panel.style.display = "block";
-  panel.innerHTML = "⏳ Loading tables...";
+  info.innerHTML = "⏳ Loading tables...";
   if (left) left.style.width = "65%";
 
   try {
@@ -111,48 +79,25 @@ window.toggleTables = async function () {
     const data = await res.json();
 
     let html = "";
-
-    // ✅ Case 1: { tables: [...] }
-    if (Array.isArray(data.tables)) {
-      html += "<ul>";
-      data.tables.forEach(t => {
-        html += `<li>${t}</li>`;
-      });
-      html += "</ul>";
+    for (const [table, obj] of Object.entries(data)) {
+      html += `<h4>${table}</h4>`;
+      html += renderTable(obj.columns, obj.rows);
     }
 
-    // ✅ Case 2: [ "table1", "table2" ]
-    else if (Array.isArray(data)) {
-      html += "<ul>";
-      data.forEach(t => {
-        html += `<li>${t}</li>`;
-      });
-      html += "</ul>";
-    }
-
-    // ✅ Case 3: full table structure
-    else {
-      for (const [table, obj] of Object.entries(data)) {
-        html += `<h4>${table}</h4>`;
-        if (obj.columns && obj.rows) {
-          html += renderTable(obj.columns, obj.rows);
-        }
-      }
-    }
-
-    panel.innerHTML = html || "⚠️ No tables found";
+    info.innerHTML = html || "No tables found";
   } catch (e) {
     console.error(e);
-    panel.innerHTML = "❌ Failed to load tables";
+    info.innerHTML = "❌ Failed to load tables";
   }
 };
 
-/* ================= RUN SQL (UNCHANGED) ================= */
+/* ================= SQL ================= */
 
 window.runQuery = async function () {
   const qid = document.getElementById("qid");
   const sqlEl = document.getElementById("sql");
   const out = document.getElementById("output");
+
   if (!qid || !sqlEl || !out) return;
 
   const sql = sqlEl.value.trim();
@@ -175,25 +120,57 @@ window.runQuery = async function () {
   `;
 };
 
-/* ================= NEW YEAR BANNER (FIXED) ================= */
+window.showAnswer = async function () {
+  const qid = document.getElementById("qid");
+  const out = document.getElementById("output");
 
-document.addEventListener("DOMContentLoaded", () => {
-  const banner = document.getElementById("newYearBanner");
-  if (!banner) return;
+  const res = await fetch("/show-answer", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ qid: qid.value })
+  });
 
-  const now = new Date();
-  const start = new Date("2026-01-01T00:00:00");
-  const end = new Date("2026-01-01T23:59:59");
+  const data = await res.json();
+  out.innerHTML = `
+    <h4>Correct Query</h4>
+    <pre>${data.expected_sql}</pre>
+    ${renderTable(data.cols, data.rows)}
+  `;
+};
 
-  banner.style.display =
-    now >= start && now <= end ? "block" : "none";
+/* ================= AI ================= */
 
-  // Optional voice greeting (mobile only)
-  if (now >= start && now <= end && isMobileDevice()) {
-    setTimeout(() => {
-      try {
-        speak("Happy New Year! Welcome to SQL Practice.");
-      } catch {}
-    }, 300);
-  }
-});
+window.askAIMentor = function () {
+  const input = document.getElementById("aiInput");
+  const out = document.getElementById("aiOutput");
+
+  if (!input.value.trim()) return;
+
+  fetch("/ai/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: input.value })
+  })
+    .then(r => r.text())
+    .then(reply => {
+      out.innerHTML = formatForDisplay(reply);
+      speak(reply);
+    });
+};
+
+/* ================= MIC ================= */
+
+window.startVoiceInput = function () {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+
+  recognition = new SR();
+  recognition.lang = "en-IN";
+  recognition.start();
+
+  recognition.onresult = e => {
+    const text = e.results[0][0].transcript;
+    document.getElementById("aiInput").value = text;
+    askAIMentor();
+  };
+};
