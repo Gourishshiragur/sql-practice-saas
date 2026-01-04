@@ -1,33 +1,11 @@
 console.log("✅ app.js loaded");
 
-/* ================= PWA INSTALL ================= */
-
-let deferredPrompt = null;
-
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  const btn = document.getElementById("installBtn");
-  if (btn) btn.style.display = "inline-block";
-});
-
-window.installApp = async function () {
-  if (!deferredPrompt) {
-    alert("Install option not available yet.");
-    return;
-  }
-  deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
-  deferredPrompt = null;
-};
-
 /* ================= GLOBAL ================= */
-
 let recognition = null;
 let isListening = false;
+let isSpeaking = false;
 
 /* ================= UTIL ================= */
-
 function renderTable(cols, rows) {
   let html = "<table><tr>";
   cols.forEach(c => html += `<th>${c}</th>`);
@@ -45,58 +23,35 @@ function renderTable(cols, rows) {
 function formatForDisplay(text) {
   return text.replace(/\n/g, "<br>");
 }
-/* ================= SPEAK UI STATE (RESTORED) ================= */
 
-function setSpeakListening(active) {
-  const btn = document.getElementById("speakBtn");
-  const stopBtn = document.getElementById("stopBtn");
-
-  if (btn) btn.classList.toggle("listening", active);
-  if (stopBtn) stopBtn.style.display = active ? "inline-block" : "none";
-}
-
-function stopSpeaking() {
-  if (recognition) {
-    try { recognition.stop(); } catch {}
-  }
-  if (window.speechSynthesis) {
-    speechSynthesis.cancel();
-  }
-  isListening = false;
-  setSpeakListening(false);
-}
-
-/* ================= SPEAK ================= */
+/* ================= SPEECH ================= */
 function normalizeForSpeech(text) {
   return text
-    .replace(/\|/g, '')        // remove vertical bars
-    .replace(/_/g, ' ')        // underscore → space
-    .replace(/---+/g, '')      // markdown separators
-    .replace(/\n/g, '. ')      // new lines → pause
-    .replace(/\s+/g, ' ')      // extra spaces
+    .replace(/\|/g, "")
+    .replace(/_/g, " ")
+    .replace(/\n/g, ". ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
 function speak(text) {
   if (!window.speechSynthesis || !text) return;
 
-  // 🔥 NORMALIZE HERE
-  const cleanText = normalizeForSpeech(text);
+  if (isSpeaking) {
+    speechSynthesis.cancel();
+    isSpeaking = false;
+    return;
+  }
 
-  speechSynthesis.cancel(); // stop previous speech
-
-  const u = new SpeechSynthesisUtterance(cleanText);
+  const u = new SpeechSynthesisUtterance(normalizeForSpeech(text));
   u.lang = "en-IN";
-  u.rate = 1;
-  u.pitch = 1;
+  u.onend = () => isSpeaking = false;
 
+  isSpeaking = true;
   speechSynthesis.speak(u);
 }
 
-/* ================= SHOW TABLES ================= */
-
-/* ================= SQL ================= */
-
+/* ================= TABLES ================= */
 window.toggleTables = async function () {
   const panel = document.getElementById("tablePanel");
   const info = document.getElementById("tableInfo");
@@ -104,7 +59,6 @@ window.toggleTables = async function () {
 
   if (!panel || !info) return;
 
-  // toggle close
   if (panel.style.display === "block") {
     panel.style.display = "none";
     if (left) left.style.width = "100%";
@@ -112,168 +66,89 @@ window.toggleTables = async function () {
   }
 
   panel.style.display = "block";
-  info.innerHTML = "⏳ Loading tables...";
-  if (left) left.style.width = "65%";
+  info.innerHTML = "Loading...";
 
-  try {
-    const res = await fetch("/tables");
-    const data = await res.json();
+  const res = await fetch("/tables");
+  const data = await res.json();
 
-    let html = "";
-    for (const [table, obj] of Object.entries(data)) {
-      html += `<h4>${table}</h4>`;
-      html += renderTable(obj.columns, obj.rows);
-    }
-
-    info.innerHTML = html || "⚠️ No tables found";
-  } catch (e) {
-    console.error(e);
-    info.innerHTML = "❌ Failed to load tables";
+  let html = "";
+  for (const [table, obj] of Object.entries(data)) {
+    html += `<h4>${table}</h4>`;
+    html += renderTable(obj.columns, obj.rows);
   }
+  info.innerHTML = html;
 };
 
-
 /* ================= SQL ================= */
-
 window.runQuery = async function () {
-  const qid = document.getElementById("qid");
-  const sqlEl = document.getElementById("sql");
+  const qid = document.getElementById("qid").value;
+  const sql = document.getElementById("sql").value;
   const out = document.getElementById("output");
-
-  if (!qid || !sqlEl || !out) return;
-
-  const sql = sqlEl.value.trim();
-  if (!sql) {
-    out.innerText = "Enter SQL query";
-    return;
-  }
 
   const res = await fetch("/run", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ qid: qid.value, user_sql: sql })
+    body: new URLSearchParams({ qid, user_sql: sql })
   });
 
   const data = await res.json();
   out.innerHTML = `
-    <b>${data.status === "correct" ? "✅ Correct" : "❌ Wrong"}</b>
+    <b>${data.status}</b>
     <pre>${data.expected_sql}</pre>
     ${renderTable(data.cols, data.rows)}
   `;
 };
 
 window.showAnswer = async function () {
-  const qid = document.getElementById("qid");
+  const qid = document.getElementById("qid").value;
   const out = document.getElementById("output");
 
   const res = await fetch("/show-answer", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ qid: qid.value })
+    body: new URLSearchParams({ qid })
   });
 
   const data = await res.json();
   out.innerHTML = `
-    <h4>Correct Query</h4>
     <pre>${data.expected_sql}</pre>
     ${renderTable(data.cols, data.rows)}
   `;
 };
-window.nextQuestion = function () {
-  const qid = document.getElementById("qid");
-  if (!qid) return;
 
-  const nextId = parseInt(qid.value, 10) + 1;
-  window.location.href = `/?qid=${nextId}`;
-};
-
-window.prevQuestion = function () {
-  const qid = document.getElementById("qid");
-  if (!qid) return;
-
-  const current = parseInt(qid.value, 10);
-  if (current > 1) {
-    function getParam(name) {
+/* ================= NAVIGATION ================= */
+function getParam(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
 
 window.nextQuestion = function () {
-  const qIndex = parseInt(getParam("q_index") || "0", 10);
+  const idx = Number(getParam("q_index") || 0);
   const level = getParam("level") || "easy";
-  window.location.href = `/?level=${level}&q_index=${qIndex + 1}`;
+  window.location.href = `/?level=${level}&q_index=${idx + 1}`;
 };
 
 window.prevQuestion = function () {
-  const qIndex = parseInt(getParam("q_index") || "0", 10);
+  const idx = Number(getParam("q_index") || 0);
   const level = getParam("level") || "easy";
-  if (qIndex > 0) {
-    window.location.href = `/?level=${level}&q_index=${qIndex - 1}`;
+  if (idx > 0) {
+    window.location.href = `/?level=${level}&q_index=${idx - 1}`;
   }
 };
 
-
-
 /* ================= AI ================= */
-
 window.askAIMentor = function () {
-  const input = document.getElementById("aiInput");
+  const input = document.getElementById("aiInput").value;
   const out = document.getElementById("aiOutput");
-
-  if (!input.value.trim()) return;
 
   fetch("/tools/ai/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: input.value })
+    body: JSON.stringify({ message: input })
   })
-    .then(r => {
-      if (!r.ok) throw new Error("AI API failed");
-      return r.text();
-    })
+    .then(r => r.text())
     .then(reply => {
       out.innerHTML = formatForDisplay(reply);
       speak(reply);
     })
-    .catch(err => {
-      out.innerText = "❌ AI service not available";
-      console.error(err);
-    });
-};
-
-/* ================= MIC ================= */
-
-window.startVoiceInput = function () {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return;
-
-  // toggle OFF if already listening
-  if (isListening) {
-    stopSpeaking();
-    return;
-  }
-
-  recognition = new SR();
-  recognition.lang = "en-IN";
-  recognition.continuous = false;
-
-  isListening = true;
-  setSpeakListening(true);
-
-  recognition.onresult = function (e) {
-    const text = e.results[0][0].transcript;
-    document.getElementById("aiInput").value = text;
-    askAIMentor();
-  };
-
-  recognition.onend = function () {
-    isListening = false;
-    setSpeakListening(false);
-  };
-
-  recognition.onerror = function () {
-    isListening = false;
-    setSpeakListening(false);
-  };
-
-  recognition.start();
+    .catch(() => out.innerText = "AI error");
 };
