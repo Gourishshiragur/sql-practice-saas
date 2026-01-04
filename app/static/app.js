@@ -1,8 +1,6 @@
 console.log("✅ app.js loaded");
 
 /* ================= GLOBAL ================= */
-let recognition = null;
-let isListening = false;
 let isSpeaking = false;
 
 /* ================= UTIL ================= */
@@ -27,7 +25,10 @@ function formatForDisplay(text) {
 /* ================= SPEECH ================= */
 function normalizeForSpeech(text) {
   return text
-    .replace(/\|/g, "")
+    // remove emojis
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
+    // remove symbols
+    .replace(/[\/\\|_*#@₹$%^&+=<>]/g, "")
     .replace(/_/g, " ")
     .replace(/\n/g, ". ")
     .replace(/\s+/g, " ")
@@ -43,7 +44,7 @@ function setSpeakActive(active) {
 function speak(text) {
   if (!window.speechSynthesis || !text) return;
 
-  // Toggle OFF
+  // 🔁 Toggle OFF
   if (isSpeaking) {
     speechSynthesis.cancel();
     isSpeaking = false;
@@ -51,7 +52,10 @@ function speak(text) {
     return;
   }
 
-  const u = new SpeechSynthesisUtterance(normalizeForSpeech(text));
+  const cleanText = normalizeForSpeech(text);
+  if (!cleanText) return;
+
+  const u = new SpeechSynthesisUtterance(cleanText);
   u.lang = "en-IN";
 
   u.onend = () => {
@@ -63,6 +67,16 @@ function speak(text) {
   setSpeakActive(true);
   speechSynthesis.speak(u);
 }
+
+/* ================= SPEAK BUTTON (ONLY TRIGGER) ================= */
+window.handleSpeakClick = function () {
+  const text =
+    document.getElementById("output")?.innerText ||
+    document.getElementById("aiOutput")?.innerText ||
+    "";
+
+  speak(text);
+};
 
 /* ================= TABLES ================= */
 window.toggleTables = async function () {
@@ -103,10 +117,8 @@ window.runQuery = async function () {
   const sql = sqlEl.value.trim();
   const qid = qidEl.value;
 
-  // 🔴 EMPTY SQL HANDLING (FIX)
   if (!sql) {
     out.innerHTML = "⚠️ Please enter a SQL query before running.";
-    speak("Please enter a SQL query before running.");
     return;
   }
 
@@ -117,9 +129,17 @@ window.runQuery = async function () {
   });
 
   const data = await res.json();
+  const isCorrect = data.status === "correct";
+
   out.innerHTML = `
-    <b>${data.status}</b>
-    <pre>${data.expected_sql}</pre>
+    <b style="color:${isCorrect ? "green" : "red"}; font-size:16px;">
+      ${isCorrect ? "✅ CORRECT" : "❌ WRONG"}
+    </b>
+    ${
+      !isCorrect
+        ? `<div><b>Correct Query:</b><pre>${data.expected_sql}</pre></div>`
+        : ""
+    }
     ${renderTable(data.cols, data.rows)}
   `;
 };
@@ -136,6 +156,7 @@ window.showAnswer = async function () {
 
   const data = await res.json();
   out.innerHTML = `
+    <b>✔ Correct Query</b>
     <pre>${data.expected_sql}</pre>
     ${renderTable(data.cols, data.rows)}
   `;
@@ -178,7 +199,7 @@ window.askAIMentor = function () {
     .then(r => r.text())
     .then(reply => {
       out.innerHTML = formatForDisplay(reply);
-      speak(reply);
+      // ❌ NO AUTO SPEAK HERE
     })
     .catch(() => out.innerText = "AI error");
 };
