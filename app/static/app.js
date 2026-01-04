@@ -34,20 +34,33 @@ function normalizeForSpeech(text) {
     .trim();
 }
 
+function setSpeakActive(active) {
+  const btn = document.getElementById("speakBtn");
+  if (!btn) return;
+  btn.classList.toggle("listening", active);
+}
+
 function speak(text) {
   if (!window.speechSynthesis || !text) return;
 
+  // Toggle OFF
   if (isSpeaking) {
     speechSynthesis.cancel();
     isSpeaking = false;
+    setSpeakActive(false);
     return;
   }
 
   const u = new SpeechSynthesisUtterance(normalizeForSpeech(text));
   u.lang = "en-IN";
-  u.onend = () => isSpeaking = false;
+
+  u.onend = () => {
+    isSpeaking = false;
+    setSpeakActive(false);
+  };
 
   isSpeaking = true;
+  setSpeakActive(true);
   speechSynthesis.speak(u);
 }
 
@@ -66,7 +79,7 @@ window.toggleTables = async function () {
   }
 
   panel.style.display = "block";
-  info.innerHTML = "Loading...";
+  info.innerHTML = "⏳ Loading tables...";
 
   const res = await fetch("/tables");
   const data = await res.json();
@@ -81,9 +94,21 @@ window.toggleTables = async function () {
 
 /* ================= SQL ================= */
 window.runQuery = async function () {
-  const qid = document.getElementById("qid").value;
-  const sql = document.getElementById("sql").value;
+  const qidEl = document.getElementById("qid");
+  const sqlEl = document.getElementById("sql");
   const out = document.getElementById("output");
+
+  if (!qidEl || !sqlEl || !out) return;
+
+  const sql = sqlEl.value.trim();
+  const qid = qidEl.value;
+
+  // 🔴 EMPTY SQL HANDLING (FIX)
+  if (!sql) {
+    out.innerHTML = "⚠️ Please enter a SQL query before running.";
+    speak("Please enter a SQL query before running.");
+    return;
+  }
 
   const res = await fetch("/run", {
     method: "POST",
@@ -139,6 +164,11 @@ window.prevQuestion = function () {
 window.askAIMentor = function () {
   const input = document.getElementById("aiInput").value;
   const out = document.getElementById("aiOutput");
+
+  if (!input.trim()) {
+    out.innerText = "Please type a question.";
+    return;
+  }
 
   fetch("/tools/ai/chat", {
     method: "POST",
