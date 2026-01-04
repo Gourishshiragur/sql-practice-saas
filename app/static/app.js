@@ -193,9 +193,24 @@ window.prevQuestion = function () {
 
   const current = parseInt(qid.value, 10);
   if (current > 1) {
-    window.location.href = `/?qid=${current - 1}`;
+    function getParam(name) {
+  return new URLSearchParams(window.location.search).get(name);
+}
+
+window.nextQuestion = function () {
+  const qIndex = parseInt(getParam("q_index") || "0", 10);
+  const level = getParam("level") || "easy";
+  window.location.href = `/?level=${level}&q_index=${qIndex + 1}`;
+};
+
+window.prevQuestion = function () {
+  const qIndex = parseInt(getParam("q_index") || "0", 10);
+  const level = getParam("level") || "easy";
+  if (qIndex > 0) {
+    window.location.href = `/?level=${level}&q_index=${qIndex - 1}`;
   }
 };
+
 
 
 /* ================= AI ================= */
@@ -206,15 +221,22 @@ window.askAIMentor = function () {
 
   if (!input.value.trim()) return;
 
-  fetch("/ai/chat", {
+  fetch("/tools/ai/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message: input.value })
   })
-    .then(r => r.text())
+    .then(r => {
+      if (!r.ok) throw new Error("AI API failed");
+      return r.text();
+    })
     .then(reply => {
       out.innerHTML = formatForDisplay(reply);
       speak(reply);
+    })
+    .catch(err => {
+      out.innerText = "❌ AI service not available";
+      console.error(err);
     });
 };
 
