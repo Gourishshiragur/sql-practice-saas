@@ -67,11 +67,29 @@ function stopSpeaking() {
 }
 
 /* ================= SPEAK ================= */
+function normalizeForSpeech(text) {
+  return text
+    .replace(/\|/g, '')        // remove vertical bars
+    .replace(/_/g, ' ')        // underscore → space
+    .replace(/---+/g, '')      // markdown separators
+    .replace(/\n/g, '. ')      // new lines → pause
+    .replace(/\s+/g, ' ')      // extra spaces
+    .trim();
+}
 
 function speak(text) {
-  if (!window.speechSynthesis) return;
-  const u = new SpeechSynthesisUtterance(text);
+  if (!window.speechSynthesis || !text) return;
+
+  // 🔥 NORMALIZE HERE
+  const cleanText = normalizeForSpeech(text);
+
+  speechSynthesis.cancel(); // stop previous speech
+
+  const u = new SpeechSynthesisUtterance(cleanText);
   u.lang = "en-IN";
+  u.rate = 1;
+  u.pitch = 1;
+
   speechSynthesis.speak(u);
 }
 
